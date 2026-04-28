@@ -1,6 +1,9 @@
 {% load static %}
 
+{# TODO: investigate whether this block/endblock wrapper is intentional or vestigial — this template is currently rendered standalone via render() and is not extended by any parent template. #}
 {% block turnstile %}
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <title>Verification required</title>
@@ -45,6 +48,6 @@
     }
     </script>
 
-</body>  
-
+</body>
+</html>
 {% endblock %}
