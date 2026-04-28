@@ -385,7 +385,8 @@ class TestEssaysViews(TestCase):
         self.assertContains(response, '<h2>Essays</h2>', html=True)
         self.assertContains(response, '<h2>Notes</h2>', html=True)
         self.assertNotContains(response, '<h3>showing')
-        self.assertContains(response, '<nav aria-label="Breadcrumb" class="page_head_primary">', html=False)
+        self.assertContains(response, '<div class="page_head_primary">', html=False)
+        self.assertContains(response, '<nav aria-label="Breadcrumb" class="page_head_breadcrumbs">', html=False)
         self.assertContains(response, '<span aria-current="page">Essays</span>', html=False)
         ## regex confirms the heading is not nested directly inside the list container.
         self.assertNotRegex(response.content.decode('utf-8'), r'<ul class="results">\s*<h2>')
