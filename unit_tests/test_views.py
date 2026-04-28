@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 
 import responses
 from django.conf import settings
@@ -475,7 +474,7 @@ class TestShopsViews(TransactionTestCase):
         response = self.client.get(reverse('shop_list'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'foo')
-        self.assertContains(response, '<h1>Shop_List</h1>', html=True)
+        self.assertContains(response, '<h1>Shop List</h1>', html=True)
         self.assertContains(response, '<h2>Print Shops</h2>', html=True)
         self.assertNotRegex(response.content.decode('utf-8'), r'<ul class="results">\s*<h2>')
 
