@@ -75,7 +75,8 @@ def std_context(path, style="rome/css/content.css",title="The Theater that was R
             if node == 'rome' or node == 'projects':
                 continue
             url += node + u'/'
-            obj = {"url": url, "name": node.replace('_', ' ').title()}
+            breadcrumb_name = ' '.join(part for part in node.split('_') if part).title() or node.title()
+            obj = {'url': url, 'name': breadcrumb_name}
             breadcrumbs.append(obj)
 
     context={}

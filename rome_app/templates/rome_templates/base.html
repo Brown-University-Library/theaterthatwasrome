@@ -28,7 +28,7 @@
               {% endfor %}
           </nav>
           {% endif %}
-          <h1>{% block page_heading %}{% if breadcrumbs %}{% with current_breadcrumb=breadcrumbs|last %}{{ current_breadcrumb.name }}{% endwith %}{% endif %}{% endblock %}</h1>
+          <h1>{% block page_heading %}{% if breadcrumbs %}{% with current_breadcrumb=breadcrumbs|last %}{{ current_breadcrumb.name }}{% endwith %}{% elif title %}{{ title }}{% endif %}{% endblock %}</h1>
           <div class = "page_icon">
           </div>
           <div class = "navigation">
