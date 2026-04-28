@@ -82,7 +82,7 @@ class TestStaticViews(TestCase):
         response = self.client.get(reverse('rome_login'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<title>Login</title>', html=True)
-        self.assertContains(response, '<h1>Login</h1>', html=True)
+        self.assertContains(response, '<h1 class="page_head_primary">Login</h1>', html=True)
         self.assertNotContains(response, '<h1></h1>')
         self.assertContains(response, '</head>')
 
@@ -381,11 +381,12 @@ class TestEssaysViews(TestCase):
         response = self.client.get(reverse('essays'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Rëd Sox')
-        self.assertContains(response, '<h1>Essays</h1>', html=True)
+        self.assertContains(response, '<h1 class="sr-only">Essays</h1>', html=True)
         self.assertContains(response, '<h2>Essays</h2>', html=True)
         self.assertContains(response, '<h2>Notes</h2>', html=True)
         self.assertNotContains(response, '<h3>showing')
-        self.assertContains(response, '<nav aria-label="Breadcrumb">', html=False)
+        self.assertContains(response, '<nav aria-label="Breadcrumb" class="page_head_primary">', html=False)
+        self.assertContains(response, '<span aria-current="page">Essays</span>', html=False)
         ## regex confirms the heading is not nested directly inside the list container.
         self.assertNotRegex(response.content.decode('utf-8'), r'<ul class="results">\s*<h2>')
 
@@ -418,7 +419,7 @@ class TestPeopleViews(TransactionTestCase):
         response = self.client.get(reverse('people'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Frëd')
-        self.assertContains(response, '<h1>People</h1>', html=True)
+        self.assertContains(response, '<h1 class="sr-only">People</h1>', html=True)
         self.assertContains(response, '<h2>showing <span id="prints_shown"></span> of 1 results; on page <span id="curr_page_span">1</span></h2>', html=True)
         self.assertNotContains(response, '<h3>showing')
 
@@ -475,7 +476,7 @@ class TestShopsViews(TransactionTestCase):
         response = self.client.get(reverse('shop_list'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'foo')
-        self.assertContains(response, '<h1>Shop List</h1>', html=True)
+        self.assertContains(response, '<h1 class="sr-only">Shop List</h1>', html=True)
         self.assertContains(response, '<h2>Print Shops</h2>', html=True)
         ## regex confirms the heading is not nested directly inside the list container.
         self.assertNotRegex(response.content.decode('utf-8'), r'<ul class="results">\s*<h2>')

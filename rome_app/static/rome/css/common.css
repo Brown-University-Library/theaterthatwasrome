@@ -90,7 +90,7 @@ p {
   * HEADER
   */
 
-div#page_head h1 {
+div#page_head .page_head_primary {
 	background: #70675d url(../images/main-header.png) repeat-x bottom;
 	background-size:contain;
 	color: #fff;
@@ -103,6 +103,23 @@ div#page_head h1 {
 	box-shadow: 0 4px 2px -2px gray;
 	height:100%;
 	max-height:80px;
+}
+
+div#page_head nav.page_head_primary a,
+div#page_head nav.page_head_primary span {
+	color: inherit;
+	text-decoration: none;
+}
+
+div#page_head nav.page_head_primary a:hover,
+div#page_head nav.page_head_primary a:focus {
+	text-decoration: underline;
+}
+
+div#page_head nav.page_head_primary .breadcrumb_separator {
+	color: #000;
+	display: inline-block;
+	padding: 0 6px;
 }
 
 #image_head {
@@ -141,6 +158,18 @@ h1 span.leftcap {
 	height: 43px;
 	margin: 0;
 	}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
 	
 .back_home {
 	position:absolute;

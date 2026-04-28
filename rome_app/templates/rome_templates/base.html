@@ -22,13 +22,17 @@
       {% block page_head %}
       <div id="page_head">
           {% if breadcrumbs %}
-          <nav aria-label="Breadcrumb">
-               {% for b in breadcrumbs %}
-              <a href="{{b.url}}">{{b.name}}</a>{% if not forloop.last %} <span style="color:#000;">«</span> {% endif %}
+          <nav aria-label="Breadcrumb" class="page_head_primary">
+                {% for b in breadcrumbs %}
+              {% if forloop.last %}
+              <span aria-current="page">{{b.name}}</span>
+              {% else %}
+              <a href="{{b.url}}">{{b.name}}</a> <span class="breadcrumb_separator" aria-hidden="true">«</span>
+              {% endif %}
               {% endfor %}
           </nav>
           {% endif %}
-          <h1>{% block page_heading %}{% if breadcrumbs %}{% with current_breadcrumb=breadcrumbs|last %}{{ current_breadcrumb.name }}{% endwith %}{% elif title %}{{ title }}{% endif %}{% endblock %}</h1>
+          <h1{% if breadcrumbs %} class="sr-only"{% else %} class="page_head_primary"{% endif %}>{% block page_heading %}{% if breadcrumbs %}{% with current_breadcrumb=breadcrumbs|last %}{{ current_breadcrumb.name }}{% endwith %}{% elif title %}{{ title }}{% endif %}{% endblock %}</h1>
           <div class = "page_icon">
           </div>
           <div class = "navigation">
