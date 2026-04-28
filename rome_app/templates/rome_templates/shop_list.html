@@ -12,6 +12,13 @@
     .pagination_rome {
     }
 
+    /* Make the "showing N results" counter match the original h3 visual weight */
+    .pagination_rome h2 {
+        font-size: 1.17em;
+        font-weight: bold;
+        margin: 0.83em 0;
+    }
+
     #page_body {
         max-width: 100%;
         margin-left:0;
@@ -27,7 +34,17 @@
         margin-left:2%;
         background-color: #E8C577;
         padding-left:35px;
+        margin-top: 0;
+    }
 
+    /* Restore golden background on section headings to match original look */
+    #page_body h2 {
+        background-color: #E8C577;
+        margin-left: 2%;
+        margin-right: 0;
+        margin-top: 15px;
+        margin-bottom: 0;
+        padding: 8px 10px 4px;
     }
 
     .row {
