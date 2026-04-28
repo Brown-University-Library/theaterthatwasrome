@@ -50,7 +50,7 @@ function load()
 
 
 {% block pagination %}
-<h3>showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></h3>
+<h2>showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></h2>
   {% for i in page_range %}
       <button id="page_button_{{i}}" class="page_button btn btn-default" onclick="show_page({{i}})">{{i}}</button>
   {% endfor %}
@@ -68,7 +68,7 @@ function load()
 {% endif %}
 
 
-  {% if filter_options %}
+{% if filter_options %}
   <br/>
   <div class="filter_options">
   Filter by:&nbsp;

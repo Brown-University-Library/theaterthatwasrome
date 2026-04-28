@@ -96,7 +96,7 @@
 {% block page_title%}The Theater that was Rome - Shops and Print Culture{% endblock %}
 
 {% block pagination %}
-<h3>showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></h3>
+<h2>showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></h2>
 {% for i in page_range %}
 <button id="page_button_{{i}}" class="page_button btn btn-default" onclick="show_page({{i}})">{{i}}</button>
 {% endfor %}
@@ -130,8 +130,8 @@
 
 
 {% block content %}
-<ul class="results">
 <h2>Print Shops</h2>
+<ul class="results">
     {% for shop in shop_objs %}
     <li value class="row">
 
@@ -150,7 +150,7 @@
     </span>
         {% endif %}
      <div class = "related">
-     
+      
       {% if shop.related_list %}
 
       {% for work in shop.thumbs %}
@@ -158,7 +158,7 @@
       {% endfor %}
     {% endif %}
     </div>
-    {% endfor %}
     </li>
+    {% endfor %}
 </ul>
 {% endblock %}

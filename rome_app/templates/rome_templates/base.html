@@ -21,12 +21,14 @@
   <body>
       {% block page_head %}
       <div id="page_head">
-          <h1>
+          {% if breadcrumbs %}
+          <nav aria-label="Breadcrumb">
                {% for b in breadcrumbs %}
               <a href="{{b.url}}">{{b.name}}</a>{% if not forloop.last %} <span style="color:#000;">«</span> {% endif %}
               {% endfor %}
-
-          </h1>
+          </nav>
+          {% endif %}
+          <h1>{% block page_heading %}{% if breadcrumbs %}{% with current_breadcrumb=breadcrumbs|last %}{{ current_breadcrumb.name }}{% endwith %}{% endif %}{% endblock %}</h1>
           <div class = "page_icon">
           </div>
           <div class = "navigation">
