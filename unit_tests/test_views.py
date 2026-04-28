@@ -78,6 +78,12 @@ class TestStaticViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Rome - Search')
 
+    def test_login_title(self):
+        response = self.client.get(reverse('rome_login'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<title>Login</title>', html=True)
+        self.assertContains(response, '</head>')
+
 
 class TestBooksViews(TestCase):
     @responses.activate
@@ -135,6 +141,9 @@ class TestBooksViews(TestCase):
         url = reverse('new_annotation', kwargs={'book_id': '230605', 'page_id': '230606'})
         response = auth_client.get(url)
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<!DOCTYPE html>')
+        self.assertContains(response, '<meta charset="utf-8">', html=True)
+        self.assertContains(response, '<title>Create Annotation</title>', html=True)
         self.assertContains(response, 'value="Submit Annotation"')
 
     @responses.activate
@@ -509,6 +518,9 @@ class TestRecordCreatorViews(TestCase):
         auth_client = get_auth_client()
         response = auth_client.get(reverse('new_genre'))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<!DOCTYPE html>')
+        self.assertContains(response, '<meta charset="utf-8">', html=True)
+        self.assertContains(response, '<title>Create Record</title>', html=True)
         self.assertContains(response, 'Text')
 
     def test_new_genre_post(self):
@@ -516,6 +528,7 @@ class TestRecordCreatorViews(TestCase):
         self.assertEqual(len(models.Genre.objects.all()), 0)
         response = auth_client.post(reverse('new_genre'), {'text': 'Book'})
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<title>Record Created</title>', html=True)
         new_genre = models.Genre.objects.get(text='Book')
         expected_js = f'opener.dismissAddAnotherPopup(window, "{new_genre.pk}", "Book");'
         self.assertContains(response, expected_js)
