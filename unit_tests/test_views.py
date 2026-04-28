@@ -385,7 +385,8 @@ class TestEssaysViews(TestCase):
         self.assertContains(response, '<h2>Essays</h2>', html=True)
         self.assertContains(response, '<h2>Notes</h2>', html=True)
         self.assertNotContains(response, '<h3>showing')
-        self.assertRegex(response.content.decode('utf-8'), r'<nav aria-label="Breadcrumb">')
+        self.assertContains(response, '<nav aria-label="Breadcrumb">', html=False)
+        ## regex confirms the heading is not nested directly inside the list container.
         self.assertNotRegex(response.content.decode('utf-8'), r'<ul class="results">\s*<h2>')
 
     @responses.activate
@@ -476,6 +477,7 @@ class TestShopsViews(TransactionTestCase):
         self.assertContains(response, 'foo')
         self.assertContains(response, '<h1>Shop List</h1>', html=True)
         self.assertContains(response, '<h2>Print Shops</h2>', html=True)
+        ## regex confirms the heading is not nested directly inside the list container.
         self.assertNotRegex(response.content.decode('utf-8'), r'<ul class="results">\s*<h2>')
 
     @responses.activate
