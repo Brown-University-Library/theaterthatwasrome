@@ -25,9 +25,14 @@
 
     .results {
         margin-left:2%;
-        background-color: #E8C577;
         padding-left:35px;
 
+    }
+
+    .result-section {
+        background-color: #E8C577;
+        padding-top: 5px;
+        padding-bottom: 10px;
     }
 
     .row {
@@ -95,7 +100,7 @@
 {% block page_title%}The Theater that was Rome - Essays{% endblock %}
 
 {% block pagination %}
-<h3>showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></h3>
+<p class="result-count">showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></p>
 {% for i in page_range %}
 <button id="page_button_{{i}}" class="page_button btn btn-default" onclick="show_page({{i}})">{{i}}</button>
 {% endfor %}
@@ -129,8 +134,9 @@
 
 
 {% block content %}
+<section class="result-section" aria-labelledby="essays-heading">
+<h2 id="essays-heading">Essays</h2>
 <ul class="results">
-<h2>Essays</h2>
     {% for essay in essay_objs %}
     {% if essay.is_note == False %}
     <li value class="row"><span>{{essay.author}}, <a href="{% url 'specific_essay' essay.slug %}">{{essay.title}}</a></span>
@@ -150,7 +156,11 @@
     </li>
     {% endif %}
     {% endfor %}
-<h2>Notes</h2>
+</ul>
+</section>
+<section class="result-section" aria-labelledby="notes-heading">
+<h2 id="notes-heading">Notes</h2>
+<ul class="results">
       {% for essay in essay_objs %}
     {% if essay.is_note == True %}
     <li value class="row"><span><a href="{% url 'specific_essay' essay.slug %}">{{essay.title}}</a></span>
@@ -170,4 +180,5 @@
     {% endif %}
     {% endfor %}
 </ul>
+</section>
 {% endblock %}

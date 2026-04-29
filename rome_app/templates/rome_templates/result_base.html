@@ -50,7 +50,7 @@ function load()
 
 
 {% block pagination %}
-<h3>showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></h3>
+<p class="result-count">showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></p>
   {% for i in page_range %}
       <button id="page_button_{{i}}" class="page_button btn btn-default" onclick="show_page({{i}})">{{i}}</button>
   {% endfor %}
