@@ -20,7 +20,7 @@
 
   <body>
       {% block page_head %}
-      <div id="page_head">
+      <header id="page_head">
           <nav aria-label="Breadcrumb" class="breadcrumb-nav">
               <ol>
                    {% for b in breadcrumbs %}
@@ -30,10 +30,10 @@
           </nav>
           <div class = "page_icon">
           </div>
-          <div class = "navigation">
+          <nav aria-label="Primary navigation" class = "navigation">
             {% block navigation %}
             {% endblock navigation %}
-          </div>
+          </nav>
 
           <div class="pagination_rome">
             {% block pagination %}
@@ -49,17 +49,17 @@
               {{page_documentation}}
               {% endblock intro %}
           </div>
-      </div>
+      </header>
       {% endblock %}
-      <div id="page_body">
+      <main id="page_body">
             {% block page_heading %}<h1 class="sr-only">{{ title }}</h1>{% endblock %}
             {% block content %}
             {% endblock content %}
-      </div>
-      <div id="footer">
+      </main>
+      <footer id="footer">
         <span>&#169; Brown University</span>
         <a href="http://www.brown.edu"><img src="{%static brown_image %}" alt="Brown University" /></a>
         <a href="http://www.stg.brown.edu"><img src="{%static stg_image %}" alt="Scholarly Technology Group" /></a>
-    </div>
+    </footer>
   </body>
 </html>
