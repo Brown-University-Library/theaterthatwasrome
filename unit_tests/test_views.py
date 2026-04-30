@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 def _relative_luminance(color: str) -> float:
     """
-    Calculates the WCAG relative luminance for a hex color.
+    Calculate the WCAG relative luminance for a hex color.
 
     Called by: unit_tests.test_views._contrast_ratio()
     """
@@ -36,7 +36,7 @@ def _relative_luminance(color: str) -> float:
 
 def _contrast_ratio(foreground: str, background: str) -> float:
     """
-    Calculates the WCAG contrast ratio between two hex colors.
+    Calculate the WCAG contrast ratio between two hex colors.
 
     Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
     """
@@ -49,7 +49,7 @@ def _contrast_ratio(foreground: str, background: str) -> float:
 
 def _css_property_value(css: str, selector: str, property_name: str) -> str:
     """
-    Extracts a CSS property value from a selector block.
+    Extract a CSS property value from a selector block.
 
     Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
     """
@@ -67,7 +67,7 @@ def _css_property_value(css: str, selector: str, property_name: str) -> str:
 
 def _first_hex_color(value: str) -> str:
     """
-    Extracts the first hex color token from a CSS property value.
+    Extract the first hex color token from a CSS property value.
 
     Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
     """
