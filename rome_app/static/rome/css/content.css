@@ -356,7 +356,11 @@ ul.navigationlink{
 
 .metadata a {
 	font-size: 16px;
-	color:  #89775D;
+	color: #5a3a18;
 	font-weight:bold;
 
+}
+
+.metadata a:hover {
+	color: #553512;
 }

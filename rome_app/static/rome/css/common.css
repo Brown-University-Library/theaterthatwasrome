@@ -14,7 +14,7 @@
  */
 
 a {
-	color: #805525;
+	color: #5a3a18;
 	text-decoration: none;
 }
 
@@ -91,7 +91,7 @@ p {
   */
 
 #page_head .breadcrumb-nav {
-	background: #70675d url(../images/main-header.png) repeat-x bottom;
+	background: #4c443d url(../images/main-header.png) repeat-x bottom;
 	background-size:contain;
 	color: #fff;
 	font-size: 24px;
@@ -165,9 +165,13 @@ h1 span.repeatbg {
 
 .breadcrumb-nav a:hover {
 	text-decoration: none;
-	color: rgb(209,205,191); /* non hover color minus (40, 40, 40) */
+	color: #f9edd2;
 	margin: 0;
 	padding: 0;
+}
+
+.breadcrumb-separator {
+	color: #dbc3af;
 }
 
 /*

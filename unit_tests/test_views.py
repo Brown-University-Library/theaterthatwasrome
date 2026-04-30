@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 
 import responses
 from django.conf import settings
@@ -48,6 +49,17 @@ class TestAdminViews(TestCase):
 
 
 class TestStaticViews(TestCase):
+    def test_accessible_contrast_styles(self):
+        common_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/common.css').read_text()
+        content_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/content.css').read_text()
+
+        self.assertIn('color: #5a3a18;', common_css)
+        self.assertIn('background: #4c443d url(../images/main-header.png) repeat-x bottom;', common_css)
+        self.assertIn('.breadcrumb-separator', common_css)
+        self.assertIn('color: #dbc3af;', common_css)
+        self.assertIn('color: #5a3a18;', content_css)
+        self.assertIn('.metadata a:hover', content_css)
+
     def test_index(self):
         response = self.client.get(reverse('index'))
         self.assertEqual(response.status_code, 200)
@@ -59,6 +71,8 @@ class TestStaticViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<h3>Red Sox lineup')  # make sure that basic markdown was rendered
         self.assertContains(response, '<p>footnote text')  # make sure that footnote was rendered
+        self.assertContains(response, 'class="breadcrumb-separator"')
+        self.assertNotContains(response, 'style="color:#fff;"')
 
     def test_links(self):
         models.Static.objects.create(title='Links', text='### Links')
