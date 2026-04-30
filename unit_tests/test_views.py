@@ -52,13 +52,14 @@ class TestStaticViews(TestCase):
         response = self.client.get(reverse('index'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'The Theater that was Rome')
-        self.assertContains(response, '<a href="#page_body" class="skip-link">Skip to main content</a>', count=1, html=True)
+        self.assertNotContains(response, '<a href="#page_body" class="skip-link">Skip to main content</a>', html=True)
         self.assertContains(response, '<main id="page_body">', count=1)
 
     def test_about(self):
         models.Static.objects.create(title='About', text='### Red Sox lineup[^n1]\n\n[^n1]: footnote text')
         response = self.client.get(reverse('about'))
         self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, '<a href="#page_body" class="skip-link">Skip to main content</a>', html=True)
         self.assertContains(response, '<h3>Red Sox lineup')  # make sure that basic markdown was rendered
         self.assertContains(response, '<p>footnote text')  # make sure that footnote was rendered
 
@@ -226,6 +227,7 @@ class TestPageViews(TestCase):
         url = reverse('book_page_viewer', kwargs={'book_id': '123', 'page_id': '123456'})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<a href="#page_body" class="skip-link">Skip to main content</a>', count=1, html=True)
 
     @responses.activate
     def test_page_detail_invalid_annotation(self):
