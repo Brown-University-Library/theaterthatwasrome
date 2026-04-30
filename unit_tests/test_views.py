@@ -15,6 +15,33 @@ from . import responses_data
 log = logging.getLogger(__name__)
 
 
+def _relative_luminance(color: str) -> float:
+    """
+    Calculates the WCAG relative luminance for a hex color.
+
+    Called by: unit_tests.test_views._contrast_ratio()
+    """
+    channels: list[float] = [int(color[index : index + 2], 16) / 255 for index in range(1, 7, 2)]
+    adjusted_channels: list[float] = []
+    for channel in channels:
+        adjusted_channels.append(channel / 12.92 if channel <= 0.03928 else ((channel + 0.055) / 1.055) ** 2.4)
+    red, green, blue = adjusted_channels
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+
+
+def _contrast_ratio(foreground: str, background: str) -> float:
+    """
+    Calculates the WCAG contrast ratio between two hex colors.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
+    """
+    luminance_a = _relative_luminance(foreground)
+    luminance_b = _relative_luminance(background)
+    lighter = max(luminance_a, luminance_b)
+    darker = min(luminance_a, luminance_b)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
 def get_auth_client(superuser=False):
     username = 'someone@brown.edu'
     password = 'pw'
@@ -50,6 +77,9 @@ class TestAdminViews(TestCase):
 
 class TestStaticViews(TestCase):
     def test_accessible_contrast_styles(self):
+        """
+        Checks that the shared contrast fix uses colors that satisfy WCAG contrast thresholds.
+        """
         common_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/common.css').read_text()
         content_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/content.css').read_text()
 
@@ -59,6 +89,10 @@ class TestStaticViews(TestCase):
         self.assertIn('color: #dbc3af;', common_css)
         self.assertIn('color: #5a3a18;', content_css)
         self.assertIn('.metadata a:hover', content_css)
+        self.assertGreaterEqual(_contrast_ratio('#5a3a18', '#E8C577'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio('#5a3a18', '#F2D69E'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio('#ffffff', '#4c443d'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio('#dbc3af', '#4c443d'), 4.5)
 
     def test_index(self):
         response = self.client.get(reverse('index'))
