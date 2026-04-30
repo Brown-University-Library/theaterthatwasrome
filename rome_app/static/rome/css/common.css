@@ -40,7 +40,7 @@ body {
 
 .skip-link {
 	position: fixed;
-	top: -40px;
+	top: -9999px;
 	left: 0;
 	background: #553512;
 	color: #fff;
