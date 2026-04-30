@@ -39,10 +39,11 @@ body {
 	}
 
 .skip-link {
+	--skip-link-hidden-offset: -200%;
 	position: fixed;
 	top: 0;
 	left: 0;
-	transform: translateY(-200%);
+	transform: translateY(var(--skip-link-hidden-offset));
 	background: #553512;
 	color: #fff;
 	padding: 8px;
