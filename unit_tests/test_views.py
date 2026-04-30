@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+import re
 
 import responses
 from django.conf import settings
@@ -21,7 +22,11 @@ def _relative_luminance(color: str) -> float:
 
     Called by: unit_tests.test_views._contrast_ratio()
     """
-    channels: list[float] = [int(color[index : index + 2], 16) / 255 for index in range(1, 7, 2)]
+    normalized_color = color
+    if len(color) == 4:
+        normalized_color = '#' + ''.join(channel * 2 for channel in color[1:])
+
+    channels: list[float] = [int(normalized_color[index : index + 2], 16) / 255 for index in range(1, 7, 2)]
     adjusted_channels: list[float] = []
     for channel in channels:
         adjusted_channels.append(channel / 12.92 if channel <= 0.03928 else ((channel + 0.055) / 1.055) ** 2.4)
@@ -40,6 +45,37 @@ def _contrast_ratio(foreground: str, background: str) -> float:
     lighter = max(luminance_a, luminance_b)
     darker = min(luminance_a, luminance_b)
     return (lighter + 0.05) / (darker + 0.05)
+
+
+def _css_property_value(css: str, selector: str, property_name: str) -> str:
+    """
+    Extracts a CSS property value from a selector block.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
+    """
+    block_match = re.search(rf'{re.escape(selector)}\s*\{{(?P<body>.*?)\}}', css, re.DOTALL)
+    if not block_match:
+        msg = f'Could not find CSS selector: {selector}'
+        raise AssertionError(msg)
+
+    property_match = re.search(rf'{re.escape(property_name)}\s*:\s*(?P<value>[^;]+);', block_match.group('body'))
+    if not property_match:
+        msg = f'Could not find property {property_name} in selector {selector}'
+        raise AssertionError(msg)
+    return property_match.group('value').strip()
+
+
+def _first_hex_color(value: str) -> str:
+    """
+    Extracts the first hex color token from a CSS property value.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
+    """
+    color_match = re.search(r'#[0-9a-fA-F]{6}', value)
+    if not color_match:
+        msg = f'Could not find a hex color in value: {value}'
+        raise AssertionError(msg)
+    return color_match.group(0)
 
 
 def get_auth_client(superuser=False):
@@ -82,17 +118,16 @@ class TestStaticViews(TestCase):
         """
         common_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/common.css').read_text()
         content_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/content.css').read_text()
+        body_link_color = _css_property_value(common_css, 'a', 'color')
+        breadcrumb_background = _first_hex_color(_css_property_value(common_css, '#page_head .breadcrumb-nav', 'background'))
+        breadcrumb_link_color = _css_property_value(common_css, '.breadcrumb-nav a', 'color')
+        breadcrumb_separator_color = _css_property_value(common_css, '.breadcrumb-separator', 'color')
+        result_link_color = _css_property_value(content_css, '.metadata a', 'color')
 
-        self.assertIn('color: #5a3a18;', common_css)
-        self.assertIn('background: #4c443d url(../images/main-header.png) repeat-x bottom;', common_css)
-        self.assertIn('.breadcrumb-separator', common_css)
-        self.assertIn('color: #dbc3af;', common_css)
-        self.assertIn('color: #5a3a18;', content_css)
-        self.assertIn('.metadata a:hover', content_css)
-        self.assertGreaterEqual(_contrast_ratio('#5a3a18', '#E8C577'), 4.5)
-        self.assertGreaterEqual(_contrast_ratio('#5a3a18', '#F2D69E'), 4.5)
-        self.assertGreaterEqual(_contrast_ratio('#ffffff', '#4c443d'), 4.5)
-        self.assertGreaterEqual(_contrast_ratio('#dbc3af', '#4c443d'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(body_link_color, '#E8C577'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(result_link_color, '#F2D69E'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(breadcrumb_link_color, breadcrumb_background), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(breadcrumb_separator_color, breadcrumb_background), 4.5)
 
     def test_index(self):
         response = self.client.get(reverse('index'))
@@ -105,8 +140,7 @@ class TestStaticViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<h3>Red Sox lineup')  # make sure that basic markdown was rendered
         self.assertContains(response, '<p>footnote text')  # make sure that footnote was rendered
-        self.assertContains(response, 'class="breadcrumb-separator"')
-        self.assertNotContains(response, 'style="color:#fff;"')
+        self.assertContains(response, 'aria-hidden="true" class="breadcrumb-separator"')
 
     def test_links(self):
         models.Static.objects.create(title='Links', text='### Links')
