@@ -39,6 +39,7 @@ body {
 	}
 
 .skip-link {
+	/* Move the link fully above the viewport until it receives keyboard focus. */
 	--skip-link-vertical-offset: -200%;
 	position: fixed;
 	top: 0;
