@@ -19,6 +19,7 @@
   </head>
 
   <body>
+      {# Only show the skip link when there are multiple repeated navigation items to bypass. #}
       {% if breadcrumbs|length > 2 %}
       <a href="#page_body" class="skip-link">Skip to main content</a>
       {% endif %}
