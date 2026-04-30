@@ -38,6 +38,20 @@ body {
 	height:100%;
 	}
 
+.skip-link {
+	position: absolute;
+	top: -40px;
+	left: 0;
+	background: #553512;
+	color: #fff;
+	padding: 8px;
+	z-index: 100;
+}
+
+.skip-link:focus {
+	top: 0;
+}
+
 	
 h2 {
 	font: 18px Roboto, sans-serif;
