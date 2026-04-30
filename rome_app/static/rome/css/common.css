@@ -39,7 +39,7 @@ body {
 	}
 
 .skip-link {
-	position: absolute;
+	position: fixed;
 	top: -40px;
 	left: 0;
 	background: #553512;
