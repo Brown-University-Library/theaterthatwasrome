@@ -91,6 +91,7 @@ This repository is set up for agentic/Copilot workflows.
 When implementing a change (especially from an issue/task):
 
 1. Read relevant surrounding code and match existing conventions.
-2. Make the smallest correct change that satisfies the request.
+2. Make the smallest correct change that satisfies the request. But do be sure to make all needed changes, see #5.
 3. Update tests and run: `python ./run_tests.py`
 4. If you cannot run tests in your environment, still write/adjust tests and state what you would run.
+5. When changing the tag of an element (e.g., <div> -> <header>), grep the project CSS for tag-qualified selectors involving that element (e.g., div#foo, div.bar) and update them to be tag-agnostic where appropriate

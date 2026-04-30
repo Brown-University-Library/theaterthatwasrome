@@ -90,7 +90,7 @@ p {
   * HEADER
   */
 
-div#page_head .breadcrumb-nav {
+#page_head .breadcrumb-nav {
 	background: #70675d url(../images/main-header.png) repeat-x bottom;
 	background-size:contain;
 	color: #fff;
