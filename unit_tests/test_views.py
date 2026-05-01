@@ -381,7 +381,7 @@ class TestTemplateImageAltText(TestCase):
             }
         )
         essay_html = render_to_string('rome_templates/essay_detail.html', essay_context)
-        self.assertIn('alt="Thumbnail of related work"', essay_html)
+        self.assertIn('alt="Thumbnail of related work 5678"', essay_html)
 
         shop_context = views.std_context('/rome/shops/store/', style='rome/css/essays.css')
         shop_context.update(
@@ -395,7 +395,7 @@ class TestTemplateImageAltText(TestCase):
             }
         )
         shop_html = render_to_string('rome_templates/essays/shop_detail.html', shop_context)
-        self.assertIn('alt="Thumbnail for related work"', shop_html)
+        self.assertIn('alt="Thumbnail for related work 5678"', shop_html)
 
     def test_list_templates_include_thumbnail_alt_text(self):
         essay_list_context = views.std_context('/rome/essays/', style='rome/css/links.css')
@@ -455,7 +455,7 @@ class TestTemplateImageAltText(TestCase):
             }
         )
         shop_list_html = render_to_string('rome_templates/shop_list.html', shop_list_context)
-        self.assertIn('alt="Thumbnail for related work"', shop_list_html)
+        self.assertIn('alt="Thumbnail for related work 1234"', shop_list_html)
 
 
 class TestBooksViews(TestCase):
