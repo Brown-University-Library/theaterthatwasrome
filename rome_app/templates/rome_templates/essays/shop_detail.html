@@ -278,7 +278,7 @@
  <div class="img_container">
     <a href="{% url 'book_page_viewer' work.ppid work.pid %}"><img height="150px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.pid}}/"></a>
     <br>
-    <span class="field-label" style="display:inline-block;"></span> <a href="{% url 'book_page_viewer' work.ppid work.pid %}">{{work.pid}}</a>
+    <a href="{% url 'book_page_viewer' work.ppid work.pid %}">{{work.pid}}</a>
     </div>
     {% else %}
     {% endif %}
