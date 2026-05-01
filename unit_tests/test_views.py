@@ -377,11 +377,11 @@ class TestTemplateImageAltText(TestCase):
                 'essay_text': 'Body',
                 'people': [],
                 'related_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related', 'creator': 'Creator', 'genre': 'Book'}],
-                'thumbnails_list': [{'ppid': '1234', 'pid': '5678'}],
+                'thumbnails_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related'}],
             }
         )
         essay_html = render_to_string('rome_templates/essay_detail.html', essay_context)
-        self.assertIn('alt="Thumbnail of related work 5678"', essay_html)
+        self.assertIn('alt="Thumbnail of related work Related"', essay_html)
 
         shop_context = views.std_context('/rome/shops/store/', style='rome/css/essays.css')
         shop_context.update(
@@ -390,12 +390,12 @@ class TestTemplateImageAltText(TestCase):
                 'shop_text': 'Body',
                 'people': [],
                 'related_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related', 'creator': 'Creator', 'genre': 'Book'}],
-                'thumbnails_list': [{'ppid': '1234', 'pid': '5678'}],
+                'thumbnails_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related'}],
                 'documents': [],
             }
         )
         shop_html = render_to_string('rome_templates/essays/shop_detail.html', shop_context)
-        self.assertIn('alt="Thumbnail for related work 5678"', shop_html)
+        self.assertIn('alt="Thumbnail for related work Related"', shop_html)
 
     def test_list_templates_include_thumbnail_alt_text(self):
         essay_list_context = views.std_context('/rome/essays/', style='rome/css/links.css')
