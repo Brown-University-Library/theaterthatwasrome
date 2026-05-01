@@ -2,11 +2,13 @@ import json
 import logging
 from pathlib import Path
 import re
+from types import SimpleNamespace
 
 import responses
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
+from django.template.loader import render_to_string
 from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 from rome_app import models, views
@@ -328,12 +330,132 @@ class TestStaticViews(TestCase):
         response = self.client.get(reverse('search_page'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Rome - Search')
+        self.assertContains(response, 'Thumbnail for page ')
+        self.assertContains(response, 'Thumbnail for print ')
 
     def test_login_title(self):
         response = self.client.get(reverse('rome_login'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<title>Login</title>', html=True)
         self.assertContains(response, '</head>')
+
+
+class TestTemplateImageAltText(TestCase):
+    def test_detail_templates_include_thumbnail_alt_text(self):
+        book_context = views.std_context('/rome/books/123/')
+        book_context.update(
+            {
+                'book': SimpleNamespace(
+                    pages=[SimpleNamespace(url='/rome/books/123/456', thumbnail_src='https://example.com/thumb.jpg')]
+                ),
+                'annot_lookups': [],
+                'back_to_book_href': reverse('books'),
+            }
+        )
+        book_html = render_to_string('rome_templates/book_detail.html', book_context)
+        self.assertIn('alt="Page 1 thumbnail"', book_html)
+
+        biography_context = views.std_context('/rome/people/0001/')
+        biography_context.update(
+            {
+                'bio': SimpleNamespace(name='Frëd'),
+                'pages_books': {
+                    '1234': {
+                        'title': 'Book Title',
+                        'pages': [('12', {'id': '5678', 'thumb': 'https://example.com/page.jpg'})],
+                    }
+                },
+            }
+        )
+        biography_html = render_to_string('rome_templates/biography_detail.html', biography_context)
+        self.assertIn('alt="Thumbnail of page 12"', biography_html)
+
+        essay_context = views.std_context('/rome/essays/essay/', style='rome/css/essays.css')
+        essay_context.update(
+            {
+                'essay': SimpleNamespace(title='Essay', author='Author'),
+                'essay_text': 'Body',
+                'people': [],
+                'related_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related', 'creator': 'Creator', 'genre': 'Book'}],
+                'thumbnails_list': [{'ppid': '1234', 'pid': '5678'}],
+            }
+        )
+        essay_html = render_to_string('rome_templates/essay_detail.html', essay_context)
+        self.assertIn('alt="Thumbnail of related work"', essay_html)
+
+        shop_context = views.std_context('/rome/shops/store/', style='rome/css/essays.css')
+        shop_context.update(
+            {
+                'shop': SimpleNamespace(title='Store', start_date='1900', end_date='1910'),
+                'shop_text': 'Body',
+                'people': [],
+                'related_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related', 'creator': 'Creator', 'genre': 'Book'}],
+                'thumbnails_list': [{'ppid': '1234', 'pid': '5678'}],
+                'documents': [],
+            }
+        )
+        shop_html = render_to_string('rome_templates/essays/shop_detail.html', shop_context)
+        self.assertIn('alt="Thumbnail for related work"', shop_html)
+
+    def test_list_templates_include_thumbnail_alt_text(self):
+        essay_list_context = views.std_context('/rome/essays/', style='rome/css/links.css')
+        essay_list_context.update(
+            {
+                'essay_objs': [
+                    SimpleNamespace(
+                        is_note=False,
+                        author='Author',
+                        slug='essay',
+                        title='Essay',
+                        preview='Preview',
+                        related_list=[{'pid': '5678'}],
+                        thumbs=[('1234', '5678')],
+                    ),
+                    SimpleNamespace(
+                        is_note=True,
+                        author='Author',
+                        slug='note',
+                        title='Note',
+                        preview='Preview',
+                        related_list=[{'pid': '5432'}],
+                        thumbs=[('9876', '5432')],
+                    ),
+                ],
+                'num_results': 2,
+                'results_per_page': 2,
+                'page_range': [1],
+                'curr_page': 1,
+                'sorting': '',
+                'filter': '',
+                'sort_options': {},
+                'filter_options': [],
+            }
+        )
+        essay_list_html = render_to_string('rome_templates/essay_list.html', essay_list_context)
+        self.assertIn('alt="Thumbnail for 1234"', essay_list_html)
+        self.assertIn('alt="Thumbnail for 9876"', essay_list_html)
+
+        shop_list_context = views.std_context('/rome/shops/', style='rome/css/links.css')
+        shop_list_context.update(
+            {
+                'shop_objs': [
+                    SimpleNamespace(
+                        slug='store',
+                        title='Store',
+                        family=['Family'],
+                        start_date='1900',
+                        end_date='1910',
+                        related_list=[{'pid': '5678'}],
+                        thumbs=[('1234', '5678')],
+                    )
+                ],
+                'num_results': 1,
+                'results_per_page': 1,
+                'curr_page': 1,
+            }
+        )
+        shop_list_html = render_to_string('rome_templates/shop_list.html', shop_list_context)
+        self.assertIn('alt="Thumbnail for related work"', shop_list_html)
 
 
 class TestBooksViews(TestCase):

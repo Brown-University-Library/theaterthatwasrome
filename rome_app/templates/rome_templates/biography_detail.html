@@ -350,7 +350,7 @@
             {% for num,page in book.pages %}
 
                 <div class="img_container">
-                    <a href="{% url 'book_page_viewer' key page.id %}" target="_blank"><img height='150px' src="{{page.thumb}}"/></a>
+                    <a href="{% url 'book_page_viewer' key page.id %}" target="_blank"><img height='150px' src="{{page.thumb}}" alt="Thumbnail of page {{ num }}"/></a>
                     <br/>
                    Image {{ num }}
                     <!--<a href="{% url 'book_page_viewer' key page.id %}" target="_blank">{{page.title}}</a>-->

@@ -206,7 +206,7 @@ Pages marked with <span class="annotated">&nbsp;&nbsp;&nbsp;</span> are annotate
   {% for page in book.pages %}
     <div class="img_container" id="{{ page.id }}">
         <a href="{{ page.url }}" target="_blank">
-            <img src="{{ page.thumbnail_src }}" height="150px"/>
+            <img src="{{ page.thumbnail_src }}" height="150px" alt="Page {{ forloop.counter }} thumbnail"/>
         </a>
         <br />
         Image {{forloop.counter}}
