@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 import re
 from types import SimpleNamespace
-
 import responses
 from django.conf import settings
 from django.contrib.auth.models import User
