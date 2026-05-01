@@ -15,6 +15,15 @@ from . import responses_data
 
 log = logging.getLogger(__name__)
 
+BAD_INLINE_COLOR_DECLARATION_PATTERN = re.compile(
+    r'(?<![\w-])color\s*:\s*(?P<color>#d64833|#89775d|#a89b8a|#a89983)\b', re.IGNORECASE
+)
+BAD_JS_STYLE_ASSIGNMENT_PATTERN = re.compile(
+    r'style\.(?:color|borderColor)\s*=\s*[\'"](?P<color>#d64833|#89775d|#a89b8a|#a89983)[\'"]', re.IGNORECASE
+)
+INLINE_STYLE_BLOCK_PATTERN = re.compile(r'<style\b[^>]*>(?P<content>.*?)</style>', re.IGNORECASE | re.DOTALL)
+INLINE_STYLE_ATTRIBUTE_PATTERN = re.compile(r'style="(?P<content>[^"]*?)"', re.IGNORECASE | re.DOTALL)
+
 
 def _relative_luminance(color: str) -> float:
     """
@@ -76,6 +85,26 @@ def _first_hex_color(value: str) -> str:
         msg = f'Could not find a hex color in value: {value}'
         raise AssertionError(msg)
     return color_match.group(0)
+
+
+def _extract_inline_style_snippets(template_text: str) -> list[str]:
+    """
+    Extract inline <style> blocks and style attributes from template content.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_inline_template_styles_avoid_bad_contrast_colors()
+    """
+    style_blocks = [match.group('content') for match in INLINE_STYLE_BLOCK_PATTERN.finditer(template_text)]
+    style_attributes = [match.group('content') for match in INLINE_STYLE_ATTRIBUTE_PATTERN.finditer(template_text)]
+    return style_blocks + style_attributes
+
+
+def _bad_inline_color_declarations(source_text: str) -> list[str]:
+    """
+    Find disallowed inline color declarations in source text.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_inline_template_styles_avoid_bad_contrast_colors()
+    """
+    return [match.group(0) for match in BAD_INLINE_COLOR_DECLARATION_PATTERN.finditer(source_text)]
 
 
 def get_auth_client(superuser=False):
@@ -140,7 +169,7 @@ class TestStaticViews(TestCase):
 
         ## info-box beige (#F2D69E) and page-head pale yellow (#F9EDD2) backgrounds
         page_body_li_color = _css_property_value(links_css, '#page_body li', 'color')
-        page_head_li_color = _css_property_value(content_css, '#page_head li', 'color')
+        page_head_li_color = _css_property_value(content_css, '#page_head .pagination_rome li', 'color')
         annot_field_label_color = _css_property_value(content_css, '#metadata .annot_field b', 'color')
         extra_text_color = _css_property_value(content_css, '.metadata div.extra', 'color')
         h2_color = _css_property_value(home_css, 'h2', 'color')
@@ -152,9 +181,13 @@ class TestStaticViews(TestCase):
         self.assertGreaterEqual(_contrast_ratio(page_body_li_color, '#F2D69E'), 4.5, '#page_body li vs #F2D69E')
         self.assertGreaterEqual(_contrast_ratio(page_body_li_color, '#FFFFFF'), 4.5, '#page_body li vs white')
 
-        ## #page_head li renders on page-head pale yellow background (#F9EDD2)
-        self.assertGreaterEqual(_contrast_ratio(page_head_li_color, '#F9EDD2'), 4.5, '#page_head li vs #F9EDD2')
-        self.assertGreaterEqual(_contrast_ratio(page_head_li_color, '#FFFFFF'), 4.5, '#page_head li vs white')
+        ## #page_head .pagination_rome li renders on page-head pale yellow background (#F9EDD2)
+        self.assertGreaterEqual(
+            _contrast_ratio(page_head_li_color, '#F9EDD2'), 4.5, '#page_head .pagination_rome li vs #F9EDD2'
+        )
+        self.assertGreaterEqual(
+            _contrast_ratio(page_head_li_color, '#FFFFFF'), 4.5, '#page_head .pagination_rome li vs white'
+        )
 
         ## annotation field bold labels appear inside the #F2D69E detail container
         self.assertGreaterEqual(_contrast_ratio(annot_field_label_color, '#F2D69E'), 4.5, '.annot_field b vs #F2D69E')
@@ -179,6 +212,29 @@ class TestStaticViews(TestCase):
         ## pagination buttons appear on a white background
         self.assertGreaterEqual(_contrast_ratio(pagination_btn_color, '#FFFFFF'), 4.5, '.pagination_rome .btn vs white')
 
+    def test_inline_template_styles_avoid_bad_contrast_colors(self):
+        """
+        Checks that inline template styles do not use the known bad contrast colors as text colors.
+        """
+        template_dir = Path(settings.BASE_DIR, 'rome_app/templates/rome_templates')
+        for template_path in sorted(template_dir.rglob('*.html')):
+            template_text = template_path.read_text()
+            inline_styles = _extract_inline_style_snippets(template_text)
+            bad_declarations: list[str] = []
+            for style_snippet in inline_styles:
+                bad_declarations.extend(_bad_inline_color_declarations(style_snippet))
+            self.assertEqual(bad_declarations, [], f'{template_path}: {bad_declarations}')
+
+    def test_inline_js_styles_avoid_bad_contrast_colors(self):
+        """
+        Checks that JavaScript-set inline styles do not assign the known bad contrast colors.
+        """
+        js_dir = Path(settings.BASE_DIR, 'rome_app/static/rome/js')
+        for js_path in sorted(js_dir.glob('*.js')):
+            js_text = js_path.read_text()
+            bad_assignments = [match.group(0) for match in BAD_JS_STYLE_ASSIGNMENT_PATTERN.finditer(js_text)]
+            self.assertEqual(bad_assignments, [], f'{js_path}: {bad_assignments}')
+
     def test_index(self):
         response = self.client.get(reverse('index'))
         self.assertEqual(response.status_code, 200)
@@ -191,6 +247,69 @@ class TestStaticViews(TestCase):
         self.assertContains(response, '<h3>Red Sox lineup')  # make sure that basic markdown was rendered
         self.assertContains(response, '<p>footnote text')  # make sure that footnote was rendered
         self.assertContains(response, 'aria-hidden="true" class="breadcrumb-separator"')
+
+    @responses.activate
+    def test_rendered_views_avoid_bad_inline_contrast_colors(self):
+        """
+        Checks that representative rendered views for each stylesheet avoid the known bad inline text colors.
+        """
+        models.Static.objects.create(title='About', text='### About')
+        models.Document.objects.create(slug='document', consagra='0', title='Readable Document', text='### Summary')
+
+        base_url = f'https://localhost/api/collections/{settings.TTWR_COLLECTION_PID}/'
+        params = (
+            'q=genre_aat:books+AND+name:%22Fr%C3%ABd%22&fq=object_type:implicit-set&fl=*&fq=discover:BDR_PUBLIC&rows=6000'
+        )
+        responses.add(
+            responses.GET,
+            f'{base_url}?{params}',
+            body=responses_data.BIO_BOOKS,
+            status=200,
+            content_type='application/json',
+            match_querystring=True,
+        )
+        prints_params = 'q=(genre_aat:%22etchings%20(prints)%22+OR+genre_aat:%22engravings%20(prints)%22)+AND+name:%22Fr%C3%ABd%22&fq=object_type:implicit-set&fl=*&fq=discover:BDR_PUBLIC&rows=6000'
+        responses.add(
+            responses.GET,
+            f'{base_url}?{prints_params}',
+            body=responses_data.BIO_PRINTS,
+            status=200,
+            content_type='application/json',
+            match_querystring=True,
+        )
+        anno_search_url = f'https://localhost/api/search/?q=rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"+AND+object_type:%22annotation%22+AND+contributor:%22Fr%C3%ABd%22+AND+display:BDR_PUBLIC&rows=6000&fl=rel_is_annotation_of_ssim,primary_title,pid,nonsort'
+        responses.add(
+            responses.GET,
+            anno_search_url,
+            body=responses_data.ANNOTATIONS,
+            status=200,
+            content_type='application/json',
+            match_querystring=True,
+        )
+        pages_search_url = 'https://localhost/api/search/?q=(pid:test%5C:1234)+AND+display:BDR_PUBLIC&fl=pid,primary_title,nonsort,object_type,rel_is_part_of_ssim,rel_has_pagination_ssim&rows=50'
+        responses.add(
+            responses.GET,
+            pages_search_url,
+            body=responses_data.PAGES,
+            status=200,
+            content_type='application/json',
+            match_querystring=True,
+        )
+        models.Biography.objects.create(name='Frëd', trp_id='0001')
+
+        responses_by_style = {
+            'rome/css/home.css': self.client.get(reverse('index')),
+            'rome/css/links.css': self.client.get(reverse('about')),
+            'rome/css/content.css': self.client.get(reverse('person_detail', kwargs={'trp_id': '0001'})),
+            'rome/css/essays.css': self.client.get(reverse('specific_document', kwargs={'document_slug': 'document'})),
+        }
+
+        for stylesheet, response in responses_by_style.items():
+            with self.subTest(stylesheet=stylesheet):
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, stylesheet)
+                html = response.content.decode('utf-8')
+                self.assertEqual(_bad_inline_color_declarations(html), [], f'{stylesheet}: rendered bad inline colors')
 
     def test_links(self):
         models.Static.objects.create(title='Links', text='### Links')

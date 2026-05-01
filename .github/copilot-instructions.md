@@ -95,3 +95,12 @@ When implementing a change (especially from an issue/task):
 3. Update tests and run: `python ./run_tests.py`
 4. If you cannot run tests in your environment, still write/adjust tests and state what you would run.
 5. When changing the tag of an element (e.g., <div> -> <header>), grep the project CSS for tag-qualified selectors involving that element (e.g., div#foo, div.bar) and update them to be tag-agnostic where appropriate
+
+## Accessibility audit workflow
+
+- CSS-only contrast audits are incomplete for this project.
+- When checking text contrast, include all four sources:
+  - shared CSS files under `rome_app/static/rome/css/`
+  - inline `<style>` blocks in templates
+  - inline `style="..."` attributes in templates
+  - JavaScript-assigned styles such as `style.color` / `style.borderColor`
