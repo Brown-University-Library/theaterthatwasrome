@@ -129,6 +129,56 @@ class TestStaticViews(TestCase):
         self.assertGreaterEqual(_contrast_ratio(breadcrumb_link_color, breadcrumb_background), 4.5)
         self.assertGreaterEqual(_contrast_ratio(breadcrumb_separator_color, breadcrumb_background), 4.5)
 
+    def test_accessible_non_link_contrast_styles(self):
+        """
+        Checks that non-link text colors pass WCAG AA contrast against the info-box and page-head backgrounds.
+        """
+        common_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/common.css').read_text()
+        content_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/content.css').read_text()
+        home_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/home.css').read_text()
+        links_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/links.css').read_text()
+
+        ## info-box beige (#F2D69E) and page-head pale yellow (#F9EDD2) backgrounds
+        page_body_li_color = _css_property_value(links_css, '#page_body li', 'color')
+        page_head_li_color = _css_property_value(content_css, '#page_head li', 'color')
+        annot_field_label_color = _css_property_value(content_css, '#metadata .annot_field b', 'color')
+        extra_text_color = _css_property_value(content_css, '.metadata div.extra', 'color')
+        h2_color = _css_property_value(home_css, 'h2', 'color')
+        sitenav_link_color = _css_property_value(home_css, '#sitenav ul li a', 'color')
+        field_label_color = _css_property_value(common_css, '.field-label', 'color')
+        pagination_btn_color = _css_property_value(common_css, '.pagination_rome > .btn', 'color')
+
+        ## #page_body li must pass against both info-box beige and white
+        self.assertGreaterEqual(_contrast_ratio(page_body_li_color, '#F2D69E'), 4.5, '#page_body li vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(page_body_li_color, '#FFFFFF'), 4.5, '#page_body li vs white')
+
+        ## #page_head li renders on page-head pale yellow background (#F9EDD2)
+        self.assertGreaterEqual(_contrast_ratio(page_head_li_color, '#F9EDD2'), 4.5, '#page_head li vs #F9EDD2')
+        self.assertGreaterEqual(_contrast_ratio(page_head_li_color, '#FFFFFF'), 4.5, '#page_head li vs white')
+
+        ## annotation field bold labels appear inside the #F2D69E detail container
+        self.assertGreaterEqual(_contrast_ratio(annot_field_label_color, '#F2D69E'), 4.5, '.annot_field b vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(annot_field_label_color, '#FFFFFF'), 4.5, '.annot_field b vs white')
+
+        ## extra metadata text appears in the #F2D69E result cards
+        self.assertGreaterEqual(_contrast_ratio(extra_text_color, '#F2D69E'), 4.5, '.metadata .extra vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(extra_text_color, '#FFFFFF'), 4.5, '.metadata .extra vs white')
+
+        ## h2 on the home page renders on #F9EDD2
+        self.assertGreaterEqual(_contrast_ratio(h2_color, '#F9EDD2'), 4.5, 'h2 vs #F9EDD2')
+        self.assertGreaterEqual(_contrast_ratio(h2_color, '#FFFFFF'), 4.5, 'h2 vs white')
+
+        ## sitenav links render on #F9EDD2 sitenav list-item background
+        self.assertGreaterEqual(_contrast_ratio(sitenav_link_color, '#F9EDD2'), 4.5, 'sitenav a vs #F9EDD2')
+        self.assertGreaterEqual(_contrast_ratio(sitenav_link_color, '#FFFFFF'), 4.5, 'sitenav a vs white')
+
+        ## .field-label spans appear inside #F2D69E detail containers
+        self.assertGreaterEqual(_contrast_ratio(field_label_color, '#F2D69E'), 4.5, '.field-label vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(field_label_color, '#FFFFFF'), 4.5, '.field-label vs white')
+
+        ## pagination buttons appear on a white background
+        self.assertGreaterEqual(_contrast_ratio(pagination_btn_color, '#FFFFFF'), 4.5, '.pagination_rome .btn vs white')
+
     def test_index(self):
         response = self.client.get(reverse('index'))
         self.assertEqual(response.status_code, 200)

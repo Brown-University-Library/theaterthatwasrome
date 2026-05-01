@@ -321,9 +321,9 @@
 
  {% for book in books %}
             <div class="work">
-             <li><span style="color:#D64833;">Title:</span> {# {% if work.ppid %}<a href="{% url 'thumbnail_viewer' work.ppid%}">{{work.title}}</a>{% else %} #}{{book.title}}{# {% endif %} #}</li>
-             <li><span style="color:#D64833;">Author:</span> {{book.authors}}</li>
-            <li><span style="color:#D64833;">Genre:</span> {{book.genre}}</li>
+             <li><span class="field-label">Title:</span> {# {% if work.ppid %}<a href="{% url 'thumbnail_viewer' work.ppid%}">{{work.title}}</a>{% else %} #}{{book.title}}{# {% endif %} #}</li>
+             <li><span class="field-label">Author:</span> {{book.authors}}</li>
+            <li><span class="field-label">Genre:</span> {{book.genre}}</li>
             <li>{{book.pid}}</li>
             </div>
 
