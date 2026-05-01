@@ -38,6 +38,24 @@ body {
 	height:100%;
 	}
 
+.skip-link {
+	/* Move the link fully above the viewport until it receives keyboard focus. */
+	--skip-link-vertical-offset: -200%;
+	position: fixed;
+	top: 0;
+	left: 0;
+	transform: translateY(var(--skip-link-vertical-offset));
+	background: #553512;
+	color: #fff;
+	padding: 8px;
+	z-index: 100;
+	white-space: nowrap;
+}
+
+.skip-link:focus {
+	transform: translateY(0);
+}
+
 	
 h2 {
 	font: 18px Roboto, sans-serif;

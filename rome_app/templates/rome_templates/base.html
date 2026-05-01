@@ -19,6 +19,12 @@
   </head>
 
   <body>
+      {# A depth of 3 means home + section + current page, which is the first level with multiple repeated items to bypass. #}
+      {% with skip_link_min_breadcrumbs=3 %}
+      {% if breadcrumbs|length >= skip_link_min_breadcrumbs %}
+      <a href="#page_body" class="skip-link">Skip to main content</a>
+      {% endif %}
+      {% endwith %}
       {% block page_head %}
       <header id="page_head">
           <nav aria-label="Breadcrumb" class="breadcrumb-nav">
