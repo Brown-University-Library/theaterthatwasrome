@@ -261,9 +261,9 @@ var maxHeight = 0;
 <div id="relatedworks">
 {% for work in related_list %}
      <div class="work">
-    <li><span style="color:#D64833;">Title:</span> {% if work.ppid %}<a href="{% url 'thumbnail_viewer' work.ppid%}">{{work.title}}</a>{% else %}{{work.title}}{% endif %}</li>
-        <li><span style="color:#D64833;">Author:</span> {{work.creator}}</li>
-        <li><span style="color:#D64833;">Genre:</span> {{work.genre}}</li>
+    <li><span class="field-label">Title:</span> {% if work.ppid %}<a href="{% url 'thumbnail_viewer' work.ppid%}">{{work.title}}</a>{% else %}{{work.title}}{% endif %}</li>
+        <li><span class="field-label">Author:</span> {{work.creator}}</li>
+        <li><span class="field-label">Genre:</span> {{work.genre}}</li>
         <li>{{work.pid}}</li>
             </div>
 {% endfor %}
@@ -292,7 +292,7 @@ var maxHeight = 0;
  <div class="img_container">
     <a href="{% url 'book_page_viewer' work.ppid work.pid %}"><img height="150px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.pid}}/"></a>
     <br>
-    <span style="display:inline-block;color:#D64833;"></span> <a href="{% url 'book_page_viewer' work.ppid work.pid %}">{{work.pid}}</a>
+    <a href="{% url 'book_page_viewer' work.ppid work.pid %}">{{work.pid}}</a>
     </div>
     {% else %}
     {% endif %}
