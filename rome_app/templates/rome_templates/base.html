@@ -24,7 +24,7 @@
           <nav aria-label="Breadcrumb" class="breadcrumb-nav">
               <ol>
                    {% for b in breadcrumbs %}
-                  {% if not forloop.last %}<li><a href="{{b.url}}">{{b.name}}</a> <span style="color:#fff;">«</span></li> {% else %}<li aria-current="page">{{b.name}}</li>{% endif %}
+                  {% if not forloop.last %}<li><a href="{{b.url}}">{{b.name}}</a> <span aria-hidden="true" class="breadcrumb-separator">«</span></li> {% else %}<li aria-current="page">{{b.name}}</li>{% endif %}
                   {% endfor %}
               </ol>
           </nav>

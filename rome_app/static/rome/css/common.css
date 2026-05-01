@@ -14,7 +14,7 @@
  */
 
 a {
-	color: #805525;
+	color: #5a3a18;
 	text-decoration: none;
 }
 
@@ -91,7 +91,7 @@ p {
   */
 
 #page_head .breadcrumb-nav {
-	background: #70675d url(../images/main-header.png) repeat-x bottom;
+	background: #4c443d url(../images/main-header.png) repeat-x bottom;
 	background-size:contain;
 	color: #fff;
 	font-size: 24px;
@@ -165,9 +165,13 @@ h1 span.repeatbg {
 
 .breadcrumb-nav a:hover {
 	text-decoration: none;
-	color: rgb(209,205,191); /* non hover color minus (40, 40, 40) */
+	color: #f9edd2;
 	margin: 0;
 	padding: 0;
+}
+
+.breadcrumb-separator {
+	color: #dbc3af;
 }
 
 /*
@@ -218,8 +222,8 @@ div.pagination_rome {
 	background:white;
 	border-style:solid;
 	border-width:2px;
-	border-color:#D64833;
-	color: #D64833;
+	border-color:#8f2d1e;
+	color: #8f2d1e;
 	-webkit-box-shadow: 3px 3px 5px 0px rgba(0,0,0,0.36);
 	-moz-box-shadow: 3px 3px 5px 0px rgba(0,0,0,0.36);
 	box-shadow: 3px 3px 5px 0px rgba(0,0,0,0.36);
@@ -227,8 +231,15 @@ div.pagination_rome {
 }
 
 .pagination_rome > .btn {
-	border-color:#89775D;
-	color:#89775D;
+	border-color:#5e4f3e;
+	color:#5e4f3e;
+}
+
+/*
+ * Field label spans (Title:, Author:, Genre:, etc.)
+ */
+.field-label {
+	color: #8f2d1e;
 }
 /*
  * COOKIE TRAIL

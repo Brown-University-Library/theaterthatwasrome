@@ -1,5 +1,7 @@
 import json
 import logging
+from pathlib import Path
+import re
 
 import responses
 from django.conf import settings
@@ -12,6 +14,68 @@ from rome_app import models, views
 from . import responses_data
 
 log = logging.getLogger(__name__)
+
+
+def _relative_luminance(color: str) -> float:
+    """
+    Calculate the WCAG relative luminance for a hex color.
+
+    Called by: unit_tests.test_views._contrast_ratio()
+    """
+    normalized_color = color
+    if len(color) == 4:
+        normalized_color = '#' + ''.join(channel * 2 for channel in color[1:])
+
+    channels: list[float] = [int(normalized_color[index : index + 2], 16) / 255 for index in range(1, 7, 2)]
+    adjusted_channels: list[float] = []
+    for channel in channels:
+        adjusted_channels.append(channel / 12.92 if channel <= 0.03928 else ((channel + 0.055) / 1.055) ** 2.4)
+    red, green, blue = adjusted_channels
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+
+
+def _contrast_ratio(foreground: str, background: str) -> float:
+    """
+    Calculate the WCAG contrast ratio between two hex colors.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
+    """
+    luminance_a = _relative_luminance(foreground)
+    luminance_b = _relative_luminance(background)
+    lighter = max(luminance_a, luminance_b)
+    darker = min(luminance_a, luminance_b)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _css_property_value(css: str, selector: str, property_name: str) -> str:
+    """
+    Extract a CSS property value from a selector block.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
+    """
+    block_match = re.search(rf'{re.escape(selector)}\s*\{{(?P<body>.*?)\}}', css, re.DOTALL)
+    if not block_match:
+        msg = f'Could not find CSS selector: {selector}'
+        raise AssertionError(msg)
+
+    property_match = re.search(rf'{re.escape(property_name)}\s*:\s*(?P<value>[^;]+);', block_match.group('body'))
+    if not property_match:
+        msg = f'Could not find property {property_name} in selector {selector}'
+        raise AssertionError(msg)
+    return property_match.group('value').strip()
+
+
+def _first_hex_color(value: str) -> str:
+    """
+    Extract the first hex color token from a CSS property value.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
+    """
+    color_match = re.search(r'#[0-9a-fA-F]{6}', value)
+    if not color_match:
+        msg = f'Could not find a hex color in value: {value}'
+        raise AssertionError(msg)
+    return color_match.group(0)
 
 
 def get_auth_client(superuser=False):
@@ -48,6 +112,73 @@ class TestAdminViews(TestCase):
 
 
 class TestStaticViews(TestCase):
+    def test_accessible_contrast_styles(self):
+        """
+        Checks that the shared contrast fix uses colors that satisfy WCAG contrast thresholds.
+        """
+        common_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/common.css').read_text()
+        content_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/content.css').read_text()
+        body_link_color = _css_property_value(common_css, 'a', 'color')
+        breadcrumb_background = _first_hex_color(_css_property_value(common_css, '#page_head .breadcrumb-nav', 'background'))
+        breadcrumb_link_color = _css_property_value(common_css, '.breadcrumb-nav a', 'color')
+        breadcrumb_separator_color = _css_property_value(common_css, '.breadcrumb-separator', 'color')
+        result_link_color = _css_property_value(content_css, '.metadata a', 'color')
+
+        self.assertGreaterEqual(_contrast_ratio(body_link_color, '#E8C577'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(result_link_color, '#F2D69E'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(breadcrumb_link_color, breadcrumb_background), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(breadcrumb_separator_color, breadcrumb_background), 4.5)
+
+    def test_accessible_non_link_contrast_styles(self):
+        """
+        Checks that non-link text colors pass WCAG AA contrast against the info-box and page-head backgrounds.
+        """
+        common_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/common.css').read_text()
+        content_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/content.css').read_text()
+        home_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/home.css').read_text()
+        links_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/links.css').read_text()
+
+        ## info-box beige (#F2D69E) and page-head pale yellow (#F9EDD2) backgrounds
+        page_body_li_color = _css_property_value(links_css, '#page_body li', 'color')
+        page_head_li_color = _css_property_value(content_css, '#page_head li', 'color')
+        annot_field_label_color = _css_property_value(content_css, '#metadata .annot_field b', 'color')
+        extra_text_color = _css_property_value(content_css, '.metadata div.extra', 'color')
+        h2_color = _css_property_value(home_css, 'h2', 'color')
+        sitenav_link_color = _css_property_value(home_css, '#sitenav ul li a', 'color')
+        field_label_color = _css_property_value(common_css, '.field-label', 'color')
+        pagination_btn_color = _css_property_value(common_css, '.pagination_rome > .btn', 'color')
+
+        ## #page_body li must pass against both info-box beige and white
+        self.assertGreaterEqual(_contrast_ratio(page_body_li_color, '#F2D69E'), 4.5, '#page_body li vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(page_body_li_color, '#FFFFFF'), 4.5, '#page_body li vs white')
+
+        ## #page_head li renders on page-head pale yellow background (#F9EDD2)
+        self.assertGreaterEqual(_contrast_ratio(page_head_li_color, '#F9EDD2'), 4.5, '#page_head li vs #F9EDD2')
+        self.assertGreaterEqual(_contrast_ratio(page_head_li_color, '#FFFFFF'), 4.5, '#page_head li vs white')
+
+        ## annotation field bold labels appear inside the #F2D69E detail container
+        self.assertGreaterEqual(_contrast_ratio(annot_field_label_color, '#F2D69E'), 4.5, '.annot_field b vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(annot_field_label_color, '#FFFFFF'), 4.5, '.annot_field b vs white')
+
+        ## extra metadata text appears in the #F2D69E result cards
+        self.assertGreaterEqual(_contrast_ratio(extra_text_color, '#F2D69E'), 4.5, '.metadata .extra vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(extra_text_color, '#FFFFFF'), 4.5, '.metadata .extra vs white')
+
+        ## h2 on the home page renders on #F9EDD2
+        self.assertGreaterEqual(_contrast_ratio(h2_color, '#F9EDD2'), 4.5, 'h2 vs #F9EDD2')
+        self.assertGreaterEqual(_contrast_ratio(h2_color, '#FFFFFF'), 4.5, 'h2 vs white')
+
+        ## sitenav links render on #F9EDD2 sitenav list-item background
+        self.assertGreaterEqual(_contrast_ratio(sitenav_link_color, '#F9EDD2'), 4.5, 'sitenav a vs #F9EDD2')
+        self.assertGreaterEqual(_contrast_ratio(sitenav_link_color, '#FFFFFF'), 4.5, 'sitenav a vs white')
+
+        ## .field-label spans appear inside #F2D69E detail containers
+        self.assertGreaterEqual(_contrast_ratio(field_label_color, '#F2D69E'), 4.5, '.field-label vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(field_label_color, '#FFFFFF'), 4.5, '.field-label vs white')
+
+        ## pagination buttons appear on a white background
+        self.assertGreaterEqual(_contrast_ratio(pagination_btn_color, '#FFFFFF'), 4.5, '.pagination_rome .btn vs white')
+
     def test_index(self):
         response = self.client.get(reverse('index'))
         self.assertEqual(response.status_code, 200)
@@ -59,6 +190,7 @@ class TestStaticViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<h3>Red Sox lineup')  # make sure that basic markdown was rendered
         self.assertContains(response, '<p>footnote text')  # make sure that footnote was rendered
+        self.assertContains(response, 'aria-hidden="true" class="breadcrumb-separator"')
 
     def test_links(self):
         models.Static.objects.create(title='Links', text='### Links')
