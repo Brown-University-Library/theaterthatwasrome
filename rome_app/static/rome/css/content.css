@@ -26,7 +26,7 @@
 	padding: 0 10px 0;
 	}
 
-#page_head li {
+#page_head .pagination_rome li {
 	/*margin-bottom: 6px;*/
 /*	list-style-type: square;*/
 	color: #8f2d1e;
