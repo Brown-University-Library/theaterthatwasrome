@@ -238,6 +238,7 @@ function clear_results(){
  	var thumbnail = $(document.createElement('img'));
  	thumbnail.attr('height', '150px');
  	thumbnail.attr('src', "{{thumbnailquery}}"+pagepid+"/");
+ 	thumbnail.attr('alt', print ? 'Thumbnail for print ' + stripPid(pagepid) : 'Thumbnail for page ' + stripPid(pagepid));
  
  	page_link.append(thumbnail);
  	

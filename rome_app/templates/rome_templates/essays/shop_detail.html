@@ -276,7 +276,7 @@
 {% for work in thumbnails_list %}
  {% if work.ppid %}
  <div class="img_container">
-    <a href="{% url 'book_page_viewer' work.ppid work.pid %}"><img height="150px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.pid}}/"></a>
+    <a href="{% url 'book_page_viewer' work.ppid work.pid %}"><img height="150px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.pid}}/" alt="Thumbnail for related work {{ work.title }}"></a>
     <br>
     <a href="{% url 'book_page_viewer' work.ppid work.pid %}">{{work.pid}}</a>
     </div>
