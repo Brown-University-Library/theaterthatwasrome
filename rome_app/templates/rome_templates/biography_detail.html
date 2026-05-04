@@ -9,7 +9,7 @@
 <style type="text/css">
 
 
-    div#page_body{
+    #page_body{
         padding:15px;
         padding-left:0px;
         margin-left: 5%;
@@ -102,12 +102,12 @@
     h2 {
         font-family:Roboto;
         font-size:20px;
-        color:#D64833;
+        color:#8f2d1e;
     }
 
     h3 {
         font-family:Roboto;
-        color:#D64833;
+        color:#8f2d1e;
         font-weight:300;
 
     }
@@ -115,7 +115,7 @@
     #author_info ul, ol{
         padding-left:50px;
     }
-    div#page_head h1{
+    #page_head h1{
         height:30px;
         padding-top:30px;
         padding-bottom:20px;
@@ -135,7 +135,7 @@
         background:#F9EDD2;
         border-color:#D64833;
         border-style:solid;
-        color:#D64833;
+        color:#8f2d1e;
         margin-top:-30px;
         position:absolute;
         margin-left:30px;
@@ -145,7 +145,7 @@
     #roles{
         font-weight:300;
         margin-left:5px;
-        color:#A89B8A;
+        color:#5e4f3e;
     }
 
     #headleft {
@@ -181,7 +181,7 @@
         list-style-type:none;
     }
 
-    #page_head li {
+    #page_head .pagination_rome li {
         font-size:13px;
         color:#553512;
     }
@@ -321,9 +321,9 @@
 
  {% for book in books %}
             <div class="work">
-             <li><span style="color:#D64833;">Title:</span> {# {% if work.ppid %}<a href="{% url 'thumbnail_viewer' work.ppid%}">{{work.title}}</a>{% else %} #}{{book.title}}{# {% endif %} #}</li>
-             <li><span style="color:#D64833;">Author:</span> {{book.authors}}</li>
-            <li><span style="color:#D64833;">Genre:</span> {{book.genre}}</li>
+             <li><span class="field-label">Title:</span> {# {% if work.ppid %}<a href="{% url 'thumbnail_viewer' work.ppid%}">{{work.title}}</a>{% else %} #}{{book.title}}{# {% endif %} #}</li>
+             <li><span class="field-label">Author:</span> {{book.authors}}</li>
+            <li><span class="field-label">Genre:</span> {{book.genre}}</li>
             <li>{{book.pid}}</li>
             </div>
 
@@ -350,7 +350,7 @@
             {% for num,page in book.pages %}
 
                 <div class="img_container">
-                    <a href="{% url 'book_page_viewer' key page.id %}" target="_blank"><img height='150px' src="{{page.thumb}}"/></a>
+                    <a href="{% url 'book_page_viewer' key page.id %}" target="_blank"><img height='150px' src="{{page.thumb}}" alt="Thumbnail of page {{ num }}"/></a>
                     <br/>
                    Image {{ num }}
                     <!--<a href="{% url 'book_page_viewer' key page.id %}" target="_blank">{{page.title}}</a>-->

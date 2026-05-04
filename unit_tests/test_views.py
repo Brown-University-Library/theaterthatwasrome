@@ -1,10 +1,13 @@
 import json
 import logging
-
+from pathlib import Path
+import re
+from types import SimpleNamespace
 import responses
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
+from django.template.loader import render_to_string
 from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 from rome_app import models, views
@@ -12,6 +15,97 @@ from rome_app import models, views
 from . import responses_data
 
 log = logging.getLogger(__name__)
+
+BAD_INLINE_COLOR_DECLARATION_PATTERN = re.compile(
+    r'(?<![\w-])color\s*:\s*(?P<color>#d64833|#89775d|#a89b8a|#a89983)\b', re.IGNORECASE
+)
+BAD_JS_STYLE_ASSIGNMENT_PATTERN = re.compile(
+    r'style\.(?:color|borderColor)\s*=\s*[\'"](?P<color>#d64833|#89775d|#a89b8a|#a89983)[\'"]', re.IGNORECASE
+)
+INLINE_STYLE_BLOCK_PATTERN = re.compile(r'<style\b[^>]*>(?P<content>.*?)</style>', re.IGNORECASE | re.DOTALL)
+INLINE_STYLE_ATTRIBUTE_PATTERN = re.compile(r'style="(?P<content>[^"]*?)"', re.IGNORECASE | re.DOTALL)
+
+
+def _relative_luminance(color: str) -> float:
+    """
+    Calculate the WCAG relative luminance for a hex color.
+
+    Called by: unit_tests.test_views._contrast_ratio()
+    """
+    normalized_color = color
+    if len(color) == 4:
+        normalized_color = '#' + ''.join(channel * 2 for channel in color[1:])
+
+    channels: list[float] = [int(normalized_color[index : index + 2], 16) / 255 for index in range(1, 7, 2)]
+    adjusted_channels: list[float] = []
+    for channel in channels:
+        adjusted_channels.append(channel / 12.92 if channel <= 0.03928 else ((channel + 0.055) / 1.055) ** 2.4)
+    red, green, blue = adjusted_channels
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+
+
+def _contrast_ratio(foreground: str, background: str) -> float:
+    """
+    Calculate the WCAG contrast ratio between two hex colors.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
+    """
+    luminance_a = _relative_luminance(foreground)
+    luminance_b = _relative_luminance(background)
+    lighter = max(luminance_a, luminance_b)
+    darker = min(luminance_a, luminance_b)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _css_property_value(css: str, selector: str, property_name: str) -> str:
+    """
+    Extract a CSS property value from a selector block.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
+    """
+    block_match = re.search(rf'{re.escape(selector)}\s*\{{(?P<body>.*?)\}}', css, re.DOTALL)
+    if not block_match:
+        msg = f'Could not find CSS selector: {selector}'
+        raise AssertionError(msg)
+
+    property_match = re.search(rf'{re.escape(property_name)}\s*:\s*(?P<value>[^;]+);', block_match.group('body'))
+    if not property_match:
+        msg = f'Could not find property {property_name} in selector {selector}'
+        raise AssertionError(msg)
+    return property_match.group('value').strip()
+
+
+def _first_hex_color(value: str) -> str:
+    """
+    Extract the first hex color token from a CSS property value.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_accessible_contrast_styles()
+    """
+    color_match = re.search(r'#[0-9a-fA-F]{6}', value)
+    if not color_match:
+        msg = f'Could not find a hex color in value: {value}'
+        raise AssertionError(msg)
+    return color_match.group(0)
+
+
+def _extract_inline_style_snippets(template_text: str) -> list[str]:
+    """
+    Extract inline <style> blocks and style attributes from template content.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_inline_template_styles_avoid_bad_contrast_colors()
+    """
+    style_blocks = [match.group('content') for match in INLINE_STYLE_BLOCK_PATTERN.finditer(template_text)]
+    style_attributes = [match.group('content') for match in INLINE_STYLE_ATTRIBUTE_PATTERN.finditer(template_text)]
+    return style_blocks + style_attributes
+
+
+def _bad_inline_color_declarations(source_text: str) -> list[str]:
+    """
+    Find disallowed inline color declarations in source text.
+
+    Called by: unit_tests.test_views.TestStaticViews.test_inline_template_styles_avoid_bad_contrast_colors()
+    """
+    return [match.group(0) for match in BAD_INLINE_COLOR_DECLARATION_PATTERN.finditer(source_text)]
 
 
 def get_auth_client(superuser=False):
@@ -48,6 +142,100 @@ class TestAdminViews(TestCase):
 
 
 class TestStaticViews(TestCase):
+    def test_accessible_contrast_styles(self):
+        """
+        Checks that the shared contrast fix uses colors that satisfy WCAG contrast thresholds.
+        """
+        common_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/common.css').read_text()
+        content_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/content.css').read_text()
+        body_link_color = _css_property_value(common_css, 'a', 'color')
+        breadcrumb_background = _first_hex_color(_css_property_value(common_css, '#page_head .breadcrumb-nav', 'background'))
+        breadcrumb_link_color = _css_property_value(common_css, '.breadcrumb-nav a', 'color')
+        breadcrumb_separator_color = _css_property_value(common_css, '.breadcrumb-separator', 'color')
+        result_link_color = _css_property_value(content_css, '.metadata a', 'color')
+
+        self.assertGreaterEqual(_contrast_ratio(body_link_color, '#E8C577'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(result_link_color, '#F2D69E'), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(breadcrumb_link_color, breadcrumb_background), 4.5)
+        self.assertGreaterEqual(_contrast_ratio(breadcrumb_separator_color, breadcrumb_background), 4.5)
+
+    def test_accessible_non_link_contrast_styles(self):
+        """
+        Checks that non-link text colors pass WCAG AA contrast against the info-box and page-head backgrounds.
+        """
+        common_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/common.css').read_text()
+        content_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/content.css').read_text()
+        home_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/home.css').read_text()
+        links_css = Path(settings.BASE_DIR, 'rome_app/static/rome/css/links.css').read_text()
+
+        ## info-box beige (#F2D69E) and page-head pale yellow (#F9EDD2) backgrounds
+        page_body_li_color = _css_property_value(links_css, '#page_body li', 'color')
+        page_head_li_color = _css_property_value(content_css, '#page_head .pagination_rome li', 'color')
+        annot_field_label_color = _css_property_value(content_css, '#metadata .annot_field b', 'color')
+        extra_text_color = _css_property_value(content_css, '.metadata div.extra', 'color')
+        h2_color = _css_property_value(home_css, 'h2', 'color')
+        sitenav_link_color = _css_property_value(home_css, '#sitenav ul li a', 'color')
+        field_label_color = _css_property_value(common_css, '.field-label', 'color')
+        pagination_btn_color = _css_property_value(common_css, '.pagination_rome > .btn', 'color')
+
+        ## #page_body li must pass against both info-box beige and white
+        self.assertGreaterEqual(_contrast_ratio(page_body_li_color, '#F2D69E'), 4.5, '#page_body li vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(page_body_li_color, '#FFFFFF'), 4.5, '#page_body li vs white')
+
+        ## #page_head .pagination_rome li renders on page-head pale yellow background (#F9EDD2)
+        self.assertGreaterEqual(
+            _contrast_ratio(page_head_li_color, '#F9EDD2'), 4.5, '#page_head .pagination_rome li vs #F9EDD2'
+        )
+        self.assertGreaterEqual(
+            _contrast_ratio(page_head_li_color, '#FFFFFF'), 4.5, '#page_head .pagination_rome li vs white'
+        )
+
+        ## annotation field bold labels appear inside the #F2D69E detail container
+        self.assertGreaterEqual(_contrast_ratio(annot_field_label_color, '#F2D69E'), 4.5, '.annot_field b vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(annot_field_label_color, '#FFFFFF'), 4.5, '.annot_field b vs white')
+
+        ## extra metadata text appears in the #F2D69E result cards
+        self.assertGreaterEqual(_contrast_ratio(extra_text_color, '#F2D69E'), 4.5, '.metadata .extra vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(extra_text_color, '#FFFFFF'), 4.5, '.metadata .extra vs white')
+
+        ## h2 on the home page renders on #F9EDD2
+        self.assertGreaterEqual(_contrast_ratio(h2_color, '#F9EDD2'), 4.5, 'h2 vs #F9EDD2')
+        self.assertGreaterEqual(_contrast_ratio(h2_color, '#FFFFFF'), 4.5, 'h2 vs white')
+
+        ## sitenav links render on #F9EDD2 sitenav list-item background
+        self.assertGreaterEqual(_contrast_ratio(sitenav_link_color, '#F9EDD2'), 4.5, 'sitenav a vs #F9EDD2')
+        self.assertGreaterEqual(_contrast_ratio(sitenav_link_color, '#FFFFFF'), 4.5, 'sitenav a vs white')
+
+        ## .field-label spans appear inside #F2D69E detail containers
+        self.assertGreaterEqual(_contrast_ratio(field_label_color, '#F2D69E'), 4.5, '.field-label vs #F2D69E')
+        self.assertGreaterEqual(_contrast_ratio(field_label_color, '#FFFFFF'), 4.5, '.field-label vs white')
+
+        ## pagination buttons appear on a white background
+        self.assertGreaterEqual(_contrast_ratio(pagination_btn_color, '#FFFFFF'), 4.5, '.pagination_rome .btn vs white')
+
+    def test_inline_template_styles_avoid_bad_contrast_colors(self):
+        """
+        Checks that inline template styles do not use the known bad contrast colors as text colors.
+        """
+        template_dir = Path(settings.BASE_DIR, 'rome_app/templates/rome_templates')
+        for template_path in sorted(template_dir.rglob('*.html')):
+            template_text = template_path.read_text()
+            inline_styles = _extract_inline_style_snippets(template_text)
+            bad_declarations: list[str] = []
+            for style_snippet in inline_styles:
+                bad_declarations.extend(_bad_inline_color_declarations(style_snippet))
+            self.assertEqual(bad_declarations, [], f'{template_path}: {bad_declarations}')
+
+    def test_inline_js_styles_avoid_bad_contrast_colors(self):
+        """
+        Checks that JavaScript-set inline styles do not assign the known bad contrast colors.
+        """
+        js_dir = Path(settings.BASE_DIR, 'rome_app/static/rome/js')
+        for js_path in sorted(js_dir.glob('*.js')):
+            js_text = js_path.read_text()
+            bad_assignments = [match.group(0) for match in BAD_JS_STYLE_ASSIGNMENT_PATTERN.finditer(js_text)]
+            self.assertEqual(bad_assignments, [], f'{js_path}: {bad_assignments}')
+
     def test_index(self):
         response = self.client.get(reverse('index'))
         self.assertEqual(response.status_code, 200)
@@ -59,6 +247,70 @@ class TestStaticViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<h3>Red Sox lineup')  # make sure that basic markdown was rendered
         self.assertContains(response, '<p>footnote text')  # make sure that footnote was rendered
+        self.assertContains(response, 'aria-hidden="true" class="breadcrumb-separator"')
+
+    @responses.activate
+    def test_rendered_views_avoid_bad_inline_contrast_colors(self):
+        """
+        Checks that representative rendered views for each stylesheet avoid the known bad inline text colors.
+        """
+        models.Static.objects.create(title='About', text='### About')
+        models.Document.objects.create(slug='document', consagra='0', title='Readable Document', text='### Summary')
+
+        base_url = f'https://localhost/api/collections/{settings.TTWR_COLLECTION_PID}/'
+        params = (
+            'q=genre_aat:books+AND+name:%22Fr%C3%ABd%22&fq=object_type:implicit-set&fl=*&fq=discover:BDR_PUBLIC&rows=6000'
+        )
+        responses.add(
+            responses.GET,
+            f'{base_url}?{params}',
+            body=responses_data.BIO_BOOKS,
+            status=200,
+            content_type='application/json',
+            match_querystring=True,
+        )
+        prints_params = 'q=(genre_aat:%22etchings%20(prints)%22+OR+genre_aat:%22engravings%20(prints)%22)+AND+name:%22Fr%C3%ABd%22&fq=object_type:implicit-set&fl=*&fq=discover:BDR_PUBLIC&rows=6000'
+        responses.add(
+            responses.GET,
+            f'{base_url}?{prints_params}',
+            body=responses_data.BIO_PRINTS,
+            status=200,
+            content_type='application/json',
+            match_querystring=True,
+        )
+        anno_search_url = f'https://localhost/api/search/?q=rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"+AND+object_type:%22annotation%22+AND+contributor:%22Fr%C3%ABd%22+AND+display:BDR_PUBLIC&rows=6000&fl=rel_is_annotation_of_ssim,primary_title,pid,nonsort'
+        responses.add(
+            responses.GET,
+            anno_search_url,
+            body=responses_data.ANNOTATIONS,
+            status=200,
+            content_type='application/json',
+            match_querystring=True,
+        )
+        pages_search_url = 'https://localhost/api/search/?q=(pid:test%5C:1234)+AND+display:BDR_PUBLIC&fl=pid,primary_title,nonsort,object_type,rel_is_part_of_ssim,rel_has_pagination_ssim&rows=50'
+        responses.add(
+            responses.GET,
+            pages_search_url,
+            body=responses_data.PAGES,
+            status=200,
+            content_type='application/json',
+            match_querystring=True,
+        )
+        models.Biography.objects.create(name='Frëd', trp_id='0001')
+
+        responses_by_style = {
+            'rome/css/home.css': self.client.get(reverse('index')),
+            'rome/css/links.css': self.client.get(reverse('about')),
+            'rome/css/content.css': self.client.get(reverse('person_detail', kwargs={'trp_id': '0001'})),
+            'rome/css/essays.css': self.client.get(reverse('specific_document', kwargs={'document_slug': 'document'})),
+        }
+
+        for stylesheet, response in responses_by_style.items():
+            with self.subTest(stylesheet=stylesheet):
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, stylesheet)
+                html = response.content.decode('utf-8')
+                self.assertEqual(_bad_inline_color_declarations(html), [], f'{stylesheet}: rendered bad inline colors')
 
     def test_links(self):
         models.Static.objects.create(title='Links', text='### Links')
@@ -77,6 +329,132 @@ class TestStaticViews(TestCase):
         response = self.client.get(reverse('search_page'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Rome - Search')
+        self.assertContains(response, 'Thumbnail for page ')
+        self.assertContains(response, 'Thumbnail for print ')
+
+    def test_login_title(self):
+        response = self.client.get(reverse('rome_login'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<title>Login</title>', html=True)
+        self.assertContains(response, '</head>')
+
+
+class TestTemplateImageAltText(TestCase):
+    def test_detail_templates_include_thumbnail_alt_text(self):
+        book_context = views.std_context('/rome/books/123/')
+        book_context.update(
+            {
+                'book': SimpleNamespace(
+                    pages=[SimpleNamespace(url='/rome/books/123/456', thumbnail_src='https://example.com/thumb.jpg')]
+                ),
+                'annot_lookups': [],
+                'back_to_book_href': reverse('books'),
+            }
+        )
+        book_html = render_to_string('rome_templates/book_detail.html', book_context)
+        self.assertIn('alt="Page 1 thumbnail"', book_html)
+
+        biography_context = views.std_context('/rome/people/0001/')
+        biography_context.update(
+            {
+                'bio': SimpleNamespace(name='Frëd'),
+                'pages_books': {
+                    '1234': {
+                        'title': 'Book Title',
+                        'pages': [('12', {'id': '5678', 'thumb': 'https://example.com/page.jpg'})],
+                    }
+                },
+            }
+        )
+        biography_html = render_to_string('rome_templates/biography_detail.html', biography_context)
+        self.assertIn('alt="Thumbnail of page 12"', biography_html)
+
+        essay_context = views.std_context('/rome/essays/essay/', style='rome/css/essays.css')
+        essay_context.update(
+            {
+                'essay': SimpleNamespace(title='Essay', author='Author'),
+                'essay_text': 'Body',
+                'people': [],
+                'related_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related', 'creator': 'Creator', 'genre': 'Book'}],
+                'thumbnails_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related'}],
+            }
+        )
+        essay_html = render_to_string('rome_templates/essay_detail.html', essay_context)
+        self.assertIn('alt="Thumbnail of related work Related"', essay_html)
+
+        shop_context = views.std_context('/rome/shops/store/', style='rome/css/essays.css')
+        shop_context.update(
+            {
+                'shop': SimpleNamespace(title='Store', start_date='1900', end_date='1910'),
+                'shop_text': 'Body',
+                'people': [],
+                'related_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related', 'creator': 'Creator', 'genre': 'Book'}],
+                'thumbnails_list': [{'ppid': '1234', 'pid': '5678', 'title': 'Related'}],
+                'documents': [],
+            }
+        )
+        shop_html = render_to_string('rome_templates/essays/shop_detail.html', shop_context)
+        self.assertIn('alt="Thumbnail for related work Related"', shop_html)
+
+    def test_list_templates_include_thumbnail_alt_text(self):
+        essay_list_context = views.std_context('/rome/essays/', style='rome/css/links.css')
+        essay_list_context.update(
+            {
+                'essay_objs': [
+                    SimpleNamespace(
+                        is_note=False,
+                        author='Author',
+                        slug='essay',
+                        title='Essay',
+                        preview='Preview',
+                        related_list=[{'pid': '5678'}],
+                        thumbs=[('1234', '5678')],
+                    ),
+                    SimpleNamespace(
+                        is_note=True,
+                        author='Author',
+                        slug='note',
+                        title='Note',
+                        preview='Preview',
+                        related_list=[{'pid': '5432'}],
+                        thumbs=[('9876', '5432')],
+                    ),
+                ],
+                'num_results': 2,
+                'results_per_page': 2,
+                'page_range': [1],
+                'curr_page': 1,
+                'sorting': '',
+                'filter': '',
+                'sort_options': {},
+                'filter_options': [],
+            }
+        )
+        essay_list_html = render_to_string('rome_templates/essay_list.html', essay_list_context)
+        self.assertIn('alt="Thumbnail for 1234"', essay_list_html)
+        self.assertIn('alt="Thumbnail for 9876"', essay_list_html)
+
+        shop_list_context = views.std_context('/rome/shops/', style='rome/css/links.css')
+        shop_list_context.update(
+            {
+                'shop_objs': [
+                    SimpleNamespace(
+                        slug='store',
+                        title='Store',
+                        family=['Family'],
+                        start_date='1900',
+                        end_date='1910',
+                        related_list=[{'pid': '5678'}],
+                        thumbs=[('1234', '5678')],
+                    )
+                ],
+                'num_results': 1,
+                'results_per_page': 1,
+                'curr_page': 1,
+            }
+        )
+        shop_list_html = render_to_string('rome_templates/shop_list.html', shop_list_context)
+        self.assertIn('alt="Thumbnail for related work 1234"', shop_list_html)
 
 
 class TestBooksViews(TestCase):
@@ -135,7 +513,12 @@ class TestBooksViews(TestCase):
         url = reverse('new_annotation', kwargs={'book_id': '230605', 'page_id': '230606'})
         response = auth_client.get(url)
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<!DOCTYPE html>')
+        self.assertContains(response, '<meta charset="utf-8">', html=True)
+        self.assertContains(response, '<title>Create Annotation</title>', html=True)
         self.assertContains(response, 'value="Submit Annotation"')
+        self.assertContains(response, 'src="https://localhost/viewers/image/zoom/testsuite:230606?first_child_only=1"')
+        self.assertContains(response, 'title="Zoomable image viewer"')
 
     @responses.activate
     def test_new_annotation_post(self):
@@ -215,6 +598,8 @@ class TestPageViews(TestCase):
         url = reverse('book_page_viewer', kwargs={'book_id': '123', 'page_id': '123456'})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'src="https://localhost/viewers/image/zoom/testsuite:123456?first_child_only=1"')
+        self.assertContains(response, 'title="Zoomable image viewer: No Title"')
 
     @responses.activate
     def test_page_detail_invalid_annotation(self):
@@ -308,6 +693,8 @@ class TestPrintsViews(TestCase):
         url = reverse('specific_print', kwargs={'print_id': '123456'})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'src="https://localhost/viewers/image/zoom/testsuite:123456?first_child_only=1"')
+        self.assertContains(response, 'title="Zoomable image viewer: No Title"')
 
     def test_new_print_annotation_auth(self):
         url = reverse('new_print_annotation', kwargs={'print_id': '230631'})
@@ -509,6 +896,9 @@ class TestRecordCreatorViews(TestCase):
         auth_client = get_auth_client()
         response = auth_client.get(reverse('new_genre'))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<!DOCTYPE html>')
+        self.assertContains(response, '<meta charset="utf-8">', html=True)
+        self.assertContains(response, '<title>Create Record</title>', html=True)
         self.assertContains(response, 'Text')
 
     def test_new_genre_post(self):
@@ -516,6 +906,7 @@ class TestRecordCreatorViews(TestCase):
         self.assertEqual(len(models.Genre.objects.all()), 0)
         response = auth_client.post(reverse('new_genre'), {'text': 'Book'})
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<title>Record Created</title>', html=True)
         new_genre = models.Genre.objects.get(text='Book')
         expected_js = f'opener.dismissAddAnotherPopup(window, "{new_genre.pk}", "Book");'
         self.assertContains(response, expected_js)

@@ -1,6 +1,6 @@
 {% load static %}
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <title> {% block title %}{{title}}{% endblock title %}</title>
     {% block css_stylesheets %}
@@ -16,23 +16,24 @@
     {% endblock extra_head %}
 
       <link href="https://fonts.googleapis.com/css?family=Roboto:300i,300,400,400i,500" rel="stylesheet">
-  <head>
+  </head>
 
   <body>
       {% block page_head %}
-      <div id="page_head">
-          <h1>
-               {% for b in breadcrumbs %}
-              <a href="{{b.url}}">{{b.name}}</a>{% if not forloop.last %} <span style="color:#000;">«</span> {% endif %}
-              {% endfor %}
-
-          </h1>
+      <header id="page_head">
+          <nav aria-label="Breadcrumb" class="breadcrumb-nav">
+              <ol>
+                   {% for b in breadcrumbs %}
+                  {% if not forloop.last %}<li><a href="{{b.url}}">{{b.name}}</a> <span aria-hidden="true" class="breadcrumb-separator">«</span></li> {% else %}<li aria-current="page">{{b.name}}</li>{% endif %}
+                  {% endfor %}
+              </ol>
+          </nav>
           <div class = "page_icon">
           </div>
-          <div class = "navigation">
+          <nav aria-label="Primary navigation" class = "navigation">
             {% block navigation %}
             {% endblock navigation %}
-          </div>
+          </nav>
 
           <div class="pagination_rome">
             {% block pagination %}
@@ -48,16 +49,17 @@
               {{page_documentation}}
               {% endblock intro %}
           </div>
-      </div>
+      </header>
       {% endblock %}
-      <div id="page_body">
+      <main id="page_body">
+            {% block page_heading %}<h1 class="sr-only">{{ title }}</h1>{% endblock %}
             {% block content %}
             {% endblock content %}
-      </div>
-      <div id="footer">
+      </main>
+      <footer id="footer">
         <span>&#169; Brown University</span>
         <a href="http://www.brown.edu"><img src="{%static brown_image %}" alt="Brown University" /></a>
         <a href="http://www.stg.brown.edu"><img src="{%static stg_image %}" alt="Scholarly Technology Group" /></a>
-    </div>
+    </footer>
   </body>
 </html>

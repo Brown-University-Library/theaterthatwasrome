@@ -14,7 +14,7 @@
  */
 
 a {
-	color: #805525;
+	color: #5a3a18;
 	text-decoration: none;
 }
 
@@ -90,8 +90,8 @@ p {
   * HEADER
   */
 
-div#page_head h1 {
-	background: #70675d url(../images/main-header.png) repeat-x bottom;
+#page_head .breadcrumb-nav {
+	background: #4c443d url(../images/main-header.png) repeat-x bottom;
 	background-size:contain;
 	color: #fff;
 	font-size: 24px;
@@ -125,13 +125,15 @@ div#page_head h1 {
 	background-repeat:no-repeat;
 }
 
-
-h1 {
-	font: 'Roboto', sans-serif;
-	font-weight: 100;
-	height: 43px;
-	margin: 0 4px 0 4px;
+.breadcrumb-nav ol {
+	list-style: none;
+	margin: 0;
 	padding: 0;
+	font-weight: 100;
+}
+
+.breadcrumb-nav ol li {
+	display: inline;
 }
 
 h1 span.leftcap {
@@ -154,18 +156,46 @@ h1 span.repeatbg {
 	margin-right: 10px;
 	}
 	
-h1 a {
+.breadcrumb-nav a {
 	text-decoration: none;
 	color: #fff; /* same as rgb(249,245,231) */
 	margin: 0;
 	padding: 0;
 }
 
-h1 a:hover {
+.breadcrumb-nav a:hover {
 	text-decoration: none;
-	color: rgb(209,205,191); /* non hover color minus (40, 40, 40) */
+	color: #f9edd2;
 	margin: 0;
 	padding: 0;
+}
+
+.breadcrumb-separator {
+	color: #dbc3af;
+}
+
+/*
+ * Visually hidden (screen-reader only) utility
+ */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/*
+ * Result count paragraph (replaces h3 in pagination)
+ */
+.result-count {
+	font: 14px Roboto, sans-serif;
+	padding-bottom: 2px;
+	margin: 0;
 }
 
 /*
@@ -192,17 +222,19 @@ div.pagination_rome {
 	background:white;
 	border-style:solid;
 	border-width:2px;
-	border-color:#D64833;
-	color: #D64833;
+	border-color:#5e4f3e;
+	color:#5e4f3e;
 	-webkit-box-shadow: 3px 3px 5px 0px rgba(0,0,0,0.36);
 	-moz-box-shadow: 3px 3px 5px 0px rgba(0,0,0,0.36);
 	box-shadow: 3px 3px 5px 0px rgba(0,0,0,0.36);
 	margin:10px 10px 10px 0px;
 }
 
-.pagination_rome > .btn {
-	border-color:#89775D;
-	color:#89775D;
+/*
+ * Field label spans (Title:, Author:, Genre:, etc.)
+ */
+.field-label {
+	color: #8f2d1e;
 }
 /*
  * COOKIE TRAIL

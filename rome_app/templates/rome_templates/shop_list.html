@@ -25,9 +25,14 @@
 
     .results {
         margin-left:2%;
-        background-color: #E8C577;
         padding-left:35px;
 
+    }
+
+    .result-section {
+        background-color: #E8C577;
+        padding-top: 5px;
+        padding-bottom: 10px;
     }
 
     .row {
@@ -96,7 +101,7 @@
 {% block page_title%}The Theater that was Rome - Shops and Print Culture{% endblock %}
 
 {% block pagination %}
-<h3>showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></h3>
+<p class="result-count">showing <span id="prints_shown"></span> of {{num_results}} results; on page <span id="curr_page_span">{{ curr_page }}</span></p>
 {% for i in page_range %}
 <button id="page_button_{{i}}" class="page_button btn btn-default" onclick="show_page({{i}})">{{i}}</button>
 {% endfor %}
@@ -130,18 +135,19 @@
 
 
 {% block content %}
+<section class="result-section" aria-labelledby="shops-heading">
+<h2 id="shops-heading">Print Shops</h2>
 <ul class="results">
-<h2>Print Shops</h2>
     {% for shop in shop_objs %}
-    <li value class="row">
+    <li class="row">
 
-         <span style="font-size: 16px;
-    color: #89775D;
-    font-weight: bold;"> <a href="{% url 'specific_shop' shop.slug %}">{{shop.title}}</a></span>
+         <span style="font-size: 16px; color: #5e4f3e; font-weight: bold;">
+             <a href="{% url 'specific_shop' shop.slug %}">{{shop.title}}</a>
+         </span>
 
     <br>
 
-        <span style="color:#D64833; font-size:16px; margin-left:2px;">{{shop.family.0}}</span>
+        <span class="field-label" style="font-size:16px; margin-left:2px;">{{shop.family.0}}</span>
 
         {% if shop.start_date %}
         <br>
@@ -154,11 +160,12 @@
       {% if shop.related_list %}
 
       {% for work in shop.thumbs %}
-          <a href="{% url 'book_page_viewer' work.0 work.1 %}"><img height="80px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.1}}/"></a>
+          <a href="{% url 'book_page_viewer' work.0 work.1 %}"><img height="80px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.1}}/" alt="Thumbnail for related work {{ work.0 }}"></a>
       {% endfor %}
     {% endif %}
     </div>
-    {% endfor %}
     </li>
+    {% endfor %}
 </ul>
+</section>
 {% endblock %}
