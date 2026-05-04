@@ -396,6 +396,11 @@ class TestBooksViews(TestCase):
         self.assertContains(response, '<meta charset="utf-8">', html=True)
         self.assertContains(response, '<title>Create Annotation</title>', html=True)
         self.assertContains(response, 'value="Submit Annotation"')
+        self.assertContains(
+            response,
+            '<iframe src="https://localhost/viewers/image/zoom/testsuite:230606?first_child_only=1" title="Zoomable image viewer" width="98%" height="800" webkitallowfullscreen="" mozallowfullscreen="" allowfullscreen=""></iframe>',
+            html=True,
+        )
 
     @responses.activate
     def test_new_annotation_post(self):
@@ -475,6 +480,11 @@ class TestPageViews(TestCase):
         url = reverse('book_page_viewer', kwargs={'book_id': '123', 'page_id': '123456'})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<iframe src="https://localhost/viewers/image/zoom/testsuite:123456?first_child_only=1" title="Zoomable image viewer: No Title" width="100%" height="800px" webkitallowfullscreen="" mozallowfullscreen="" allowfullscreen=""></iframe>',
+            html=True,
+        )
 
     @responses.activate
     def test_page_detail_invalid_annotation(self):
@@ -568,6 +578,11 @@ class TestPrintsViews(TestCase):
         url = reverse('specific_print', kwargs={'print_id': '123456'})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<iframe src="https://localhost/viewers/image/zoom/testsuite:123456?first_child_only=1" title="Zoomable image viewer: No Title" width="100%" height="800px" webkitallowfullscreen="" mozallowfullscreen="" allowfullscreen=""></iframe>',
+            html=True,
+        )
 
     def test_new_print_annotation_auth(self):
         url = reverse('new_print_annotation', kwargs={'print_id': '230631'})
