@@ -148,7 +148,7 @@
       {% if essay.related_list %}
 
       {% for work in essay.thumbs %}
-          <a href="{% url 'book_page_viewer' work.0 work.1 %}"><img height="80px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.1}}/"></a>
+          <a href="{% url 'book_page_viewer' work.0 work.1 %}"><img height="80px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.1}}/" alt="Thumbnail for {{ work.0 }}"></a>
       {% endfor %}
     {% endif %}
     </div>
@@ -172,7 +172,7 @@
       {% if essay.related_list %}
 
       {% for work in essay.thumbs %}
-          <a href="{% url 'book_page_viewer' work.0 work.1 %}"><img height="80px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.1}}/"></a>
+          <a href="{% url 'book_page_viewer' work.0 work.1 %}"><img height="80px" src="https://repository.library.brown.edu/viewers/image/thumbnail/bdr:{{work.1}}/" alt="Thumbnail for {{ work.0 }}"></a>
       {% endfor %}
     {% endif %}
     </div>
