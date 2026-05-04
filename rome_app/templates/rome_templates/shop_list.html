@@ -139,7 +139,7 @@
 <h2 id="shops-heading">Print Shops</h2>
 <ul class="results">
     {% for shop in shop_objs %}
-    <li value class="row">
+    <li class="row">
 
          <span style="font-size: 16px; color: #5e4f3e; font-weight: bold;">
              <a href="{% url 'specific_shop' shop.slug %}">{{shop.title}}</a>
@@ -164,8 +164,8 @@
       {% endfor %}
     {% endif %}
     </div>
-    {% endfor %}
     </li>
+    {% endfor %}
 </ul>
 </section>
 {% endblock %}

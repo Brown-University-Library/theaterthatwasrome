@@ -139,7 +139,7 @@
 <ul class="results">
     {% for essay in essay_objs %}
     {% if essay.is_note == False %}
-    <li value class="row"><span>{{essay.author}}, <a href="{% url 'specific_essay' essay.slug %}">{{essay.title}}</a></span>
+    <li class="row"><span>{{essay.author}}, <a href="{% url 'specific_essay' essay.slug %}">{{essay.title}}</a></span>
     <br> {{essay.slug}} <br> 
     <div class = "preview">
     {{essay.preview}}
@@ -163,7 +163,7 @@
 <ul class="results">
       {% for essay in essay_objs %}
     {% if essay.is_note == True %}
-    <li value class="row"><span><a href="{% url 'specific_essay' essay.slug %}">{{essay.title}}</a></span>
+    <li class="row"><span><a href="{% url 'specific_essay' essay.slug %}">{{essay.title}}</a></span>
     <br> {{essay.slug}} <br>
         <div class = "preview">
     {{essay.preview}} 
