@@ -341,7 +341,7 @@ function add_low_toggle_handlers(){
 <div id="rightcontainer">
 
 <div id="image_span">
-    <iframe src={{ det_img_view_src}} width="100%" height="800px" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+    <iframe src="{{ det_img_view_src }}" title="Zoomable image viewer: {{ title_sort|default:title|default:'Unknown item' }}" width="100%" height="800px" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
 </div>
 
 {% if essays %}
