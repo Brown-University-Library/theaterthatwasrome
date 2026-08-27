@@ -1,11 +1,14 @@
-from .base import *  # noqa: F403
+from pathlib import Path
+
+from .base import *
+from .base import BASE_DIR
 
 DEBUG = True
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'rome.sqlite3',
+        'NAME': Path(BASE_DIR).parent / 'rome.sqlite3',
     }
 }
 
