@@ -5,6 +5,9 @@ ttwr
 This is the django app that runs the Theater That Was Rome project website.
 
 #### Install and Run
+
+NOTE: These instructions are outdated and no longer work
+
 - mkdir rome\_project
 - cd rome\_project
 - python3 -m venv env
