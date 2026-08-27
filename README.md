@@ -5,7 +5,6 @@
 - [Brief overview](#brief-overview)
 - [More info](#more-info)
 - [Local installation](#local-installation)
-- [Optional BDR access through an SSH tunnel](#optional-bdr-access-through-an-ssh-tunnel)
 - [Local testing](#local-testing)
 
 
@@ -76,7 +75,7 @@ uv run ./run_tests.py
 
 The unit runner selects `config.settings.unit_tests`, supplies non-production BDR placeholders, and creates a temporary log directory. The unit suite uses `responses` to mock expected HTTP calls. It does not require the normal local environment configuration.
 
-The integration suite calls a live BDR service and loads the normal `.env` file. Run it only after confirming that the selected environment and service are appropriate:
+The integration suite loads the normal `.env` file and makes live, unmocked `GET` requests to the configured BDR service. It does not call `save_to_bdr()` or `update_in_bdr()`, send `POST` or `PUT` requests, or modify BDR records. The suite creates temporary records only in Django's test database, which Django removes after the run. Confirm that the configured BDR is appropriate for live read access, then run:
 
 ```shell
 uv run ./run_integration_tests.py
