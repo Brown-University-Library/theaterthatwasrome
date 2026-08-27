@@ -90,10 +90,18 @@ This completes the normal local installation; an SSH tunnel is not required. Dja
 
 The BDR development host may accept connections only through the correct development server. In that case, use SSH local port forwarding to send local BDR requests through an SSH-accessible gateway.
 
+The commands below first show placeholders to replace with values supplied by an application maintainer. Each is followed by a concrete example using the deliberately fictitious BDR host `bdr-dev.univ.edu`, SSH login `developer@server.univ.edu`, and local port `8443`. The example values will not work as written.
+
 Choose an unused local port above 1024. Then edit `/etc/hosts` with administrator privileges and temporarily map the BDR hostname to your computer:
 
 ```text
 127.0.0.1 <bdr-host>
+```
+
+Example:
+
+```text
+127.0.0.1 bdr-dev.univ.edu
 ```
 
 The SSH gateway must use a different hostname or SSH alias that is not affected by this entry.
@@ -104,10 +112,22 @@ Update the BDR server setting in the repository-adjacent `.env` file. Keep the B
 ROME_BDR_SERVER=<bdr-host>:<local-port>
 ```
 
+Example:
+
+```dotenv
+ROME_BDR_SERVER=bdr-dev.univ.edu:8443
+```
+
 In a separate terminal tab, start the tunnel:
 
 ```shell
 ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:<local-port>:<bdr-host>:443 <ssh-user>@<ssh-gateway>
+```
+
+Example:
+
+```shell
+ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8443:bdr-dev.univ.edu:443 developer@server.univ.edu
 ```
 
 - `-N` tells SSH not to run a remote command because this connection is used only for port forwarding.
