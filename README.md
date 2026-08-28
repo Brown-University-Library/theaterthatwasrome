@@ -39,16 +39,14 @@ The main application is in `rome_app/`, including routes, views, models, forms, 
 
 ### Install the application
 
-Clone the repository and install the locked local dependency group:
-
 ```shell
 cd /path/to/ttwr_stuff/
 mkdir -p ./logs
 ```
 
-Add the `.env` to this directory. And add the `rome.sqlite3` file to this directory.
+Add the `rome.sqlite3` file to this directory. Do not commit the `.env` file or share its sensitive values. Then add the `.env` to this directory. 
 
-Then setup the code:
+Clone the repository and install the locked local dependency group::
 
 ```shell
 git clone https://github.com/Brown-University-Library/theaterthatwasrome.git ttwr
@@ -56,9 +54,9 @@ cd ttwr/
 uv sync --locked --group local
 ```
 
-Do not commit the `.env` file or share its sensitive values.
+This completes the normal local installation. 
 
-This completes the normal local installation. Django can load records from the local database, including biographies, essays, shops, documents, genres, roles, and database-backed informational pages. Without network access to the configured BDR host, BDR-dependent books, prints, page images, annotation-creation, search data, and related-record features may be unavailable, incomplete, or displayed as broken images.
+Django can load records from the local database, including biographies, essays, shops, documents, genres, roles, and database-backed informational pages. Properly configued `.env` settings will allow (if on VPN) GET network access to the configured BDR host. However, some BDR-dependent books, prints, page images, annotation-creation, search data, and related-record features may be unavailable, incomplete, or displayed as broken images.
 
 Regarding broken-images, in many cases, this occurs when viewing an iframe that's accessing our IIIF-viewer. This can be worked around by using your browser's developer-tools to "inspect" the iframe, copying the `https://hostname.edu/viewers/image/zoom/...` url, and pasting that url into a new tab.
 
@@ -80,3 +78,5 @@ The integration suite loads the normal `.env` file and makes live, unmocked `GET
 ```shell
 uv run ./run_integration_tests.py
 ```
+
+---
