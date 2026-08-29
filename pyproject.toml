@@ -13,10 +13,10 @@ dependencies = [
     "django-markdown-deux~=1.0.0",
     "django-pagedown~=2.2.0",
     "django~=5.2.0",
-    "lxml~=4.7.0",
-    "pillow~=10.4.0",
-    "requests~=2.26.0",
-    "setuptools~=75.3.0",  # required for eulxml, which is used by bdrxml
+    "lxml~=4.9.1",
+    "pillow~=12.2.0",
+    "requests~=2.33.0",
+    "setuptools~=78.1.1",  # required for eulxml, which is used by bdrxml
     "trio~=0.22.0",
 ]
 
