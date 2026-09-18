@@ -3,6 +3,10 @@
 
 {% block title %}Login{% endblock title %}
 
+{% block extra_head %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% endblock %}
+
 {% block css_stylesheets %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'rome/css/login.css' %}" type="text/css" media="screen" />
@@ -35,7 +39,10 @@
         <li><a href="{% url 'books' %}">Browse books</a></li>
         <li><a href="{% url 'prints' %}">Browse prints</a></li>
         {% if user.is_active and user.is_staff %}
-        <li><a href="{% url 'admin:index' %}">Open admin</a></li>
+        <li class="login-admin-action">
+            <a href="{% url 'admin:index' %}">Open admin</a>
+            <span class="login-admin-note">(You’re seeing this because your account also allows admin access.)</span>
+        </li>
         {% endif %}
     </ul>
 </nav>
@@ -44,7 +51,7 @@
     <button type="submit">Sign out</button>
 </form>
 {% else %}
-<form method="post" action="{% url 'rome_login' %}">
+<form class="login-form" method="post" action="{% url 'rome_login' %}">
     {% csrf_token %}
     {% if continue_url %}<input type="hidden" name="next" value="{{ continue_url }}">{% endif %}
     {% if form.non_field_errors %}

@@ -25,8 +25,12 @@ body {
 #page_body {
     flex: 1;
     width: 90%;
-    max-width: 28rem;
     margin: 2.5rem 5%;
+}
+
+.login-form,
+.login-guidance {
+    max-width: 28rem;
 }
 
 #page_body h2 {
@@ -59,6 +63,24 @@ body {
     padding: 0.35rem 0;
     text-decoration: underline;
     text-underline-offset: 0.2em;
+    white-space: nowrap;
+}
+
+.login-admin-action {
+    white-space: nowrap;
+}
+
+@media (max-width: 64rem) {
+    .login-admin-action {
+        flex-basis: 100%;
+        white-space: normal;
+    }
+
+    .login-admin-note {
+        display: block;
+        max-width: 28rem;
+        line-height: 1.6;
+    }
 }
 
 .login-field {
