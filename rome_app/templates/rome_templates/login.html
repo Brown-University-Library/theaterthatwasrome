@@ -25,10 +25,28 @@
 {% block content %}
 
 {% if user.is_authenticated %}
-<p>You are logged in.</p>
+<p class="login-status">You are logged in.</p>
+<p class="login-guidance">You can create and edit annotations on book pages and prints. Open a book page or print to find its annotation links.</p>
+<nav aria-label="Editing options">
+    <ul class="login-actions">
+        {% if continue_url %}
+        <li><a href="{{ continue_url }}">Continue editing</a></li>
+        {% endif %}
+        <li><a href="{% url 'books' %}">Browse books</a></li>
+        <li><a href="{% url 'prints' %}">Browse prints</a></li>
+        {% if user.is_active and user.is_staff %}
+        <li><a href="{% url 'admin:index' %}">Open admin</a></li>
+        {% endif %}
+    </ul>
+</nav>
+<form class="logout-form" method="post" action="{% url 'rome_logout' %}">
+    {% csrf_token %}
+    <button type="submit">Sign out</button>
+</form>
 {% else %}
 <form method="post" action="{% url 'rome_login' %}">
     {% csrf_token %}
+    {% if continue_url %}<input type="hidden" name="next" value="{{ continue_url }}">{% endif %}
     {% if form.non_field_errors %}
     <div role="alert">{{ form.non_field_errors }}</div>
     {% endif %}

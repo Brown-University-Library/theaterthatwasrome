@@ -38,6 +38,27 @@ body {
 
 #page_body p {
     margin: 0;
+    line-height: 1.6;
+}
+
+#page_body .login-status {
+    margin-bottom: 0.75rem;
+}
+
+.login-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    margin: 1.25rem 0 1.75rem;
+    padding: 0;
+    list-style: none;
+}
+
+.login-actions a {
+    display: inline-block;
+    padding: 0.35rem 0;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
 }
 
 .login-field {
@@ -76,6 +97,7 @@ button:hover {
 }
 
 .login-field input:focus-visible,
+.login-actions a:focus-visible,
 button:focus-visible {
     outline: 2px solid #553512;
     outline-offset: 3px;

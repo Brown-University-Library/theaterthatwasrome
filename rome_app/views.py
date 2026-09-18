@@ -9,6 +9,7 @@ import requests
 import trio
 from django.conf import settings
 from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ObjectDoesNotExist
@@ -23,9 +24,9 @@ from django.utils.html import escape, escapejs
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_POST, require_http_methods
 
-from rome_app.lib import annotation_helpers, version_helper
+from rome_app.lib import annotation_helpers, login_helpers, version_helper
 from rome_app.lib.version_helper import GatherCommitAndBranchData
 
 from .app_settings import BDR_SERVER, BOOKS_PER_PAGE, PID_PREFIX
@@ -106,6 +107,10 @@ def login_page(request: HttpRequest) -> HttpResponse:
     Displays the website login form and a welcome message after login.
     Called by: django.core.handlers.base.BaseHandler._get_response()
     """
+    next_url = request.POST.get('next', request.GET.get('next', ''))
+    if request.user.is_authenticated and not next_url:
+        next_url = request.session.get('rome_login_continue', '')
+    continue_url = login_helpers.editing_destination(next_url)
     form = AuthenticationForm(request, data=request.POST if request.method == 'POST' else None)
     user = None
     if request.method == 'POST' and form.is_valid():
@@ -114,12 +119,26 @@ def login_page(request: HttpRequest) -> HttpResponse:
     response: HttpResponse
     if user is not None:
         auth_login(request, user)
+        request.session['rome_login_continue'] = continue_url
         response = HttpResponseRedirect(reverse('rome_login'))
     else:
         context: dict[str, object] = std_context(request.path, style='rome/css/home.css')
         context['form'] = form
+        context['continue_url'] = continue_url
         response = render(request, 'rome_templates/login.html', context)
     return response
+
+
+@never_cache
+@csrf_protect
+@require_POST
+def logout_page(request: HttpRequest) -> HttpResponse:
+    """
+    Signs the user out and returns to the website login form.
+    Called by: django.core.handlers.base.BaseHandler._get_response()
+    """
+    auth_logout(request)
+    return HttpResponseRedirect(reverse('rome_login'))
 
 
 def index(request):

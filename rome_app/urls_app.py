@@ -1,7 +1,7 @@
-from django.urls import include, re_path
 from django.contrib import admin
-from rome_app import views
+from django.urls import re_path
 
+from rome_app import views
 
 BDR_ID_RE = '[a-z0-9]+'
 
@@ -10,6 +10,7 @@ urlpatterns = [
     #admin/user
     re_path(r'^admin/', admin.site.urls),
     re_path(r'^login/$', views.login_page, name='rome_login'),
+    re_path(r'^logout/$', views.logout_page, name='rome_logout'),
 
     #index and static
     re_path(r'^$', views.index, name='index'),

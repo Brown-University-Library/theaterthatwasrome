@@ -205,6 +205,7 @@ This Django application serves The Theater That Was Rome, a scholarly site for e
 - `rome_app/urls_app.py` groups routes for static pages, books/pages, prints, essays, people, shops, documents, authenticated record creation, search, version information, and a temporary role checker.
 - `std_context()` in `rome_app/views.py` supplies common styles, image paths, title data, and breadcrumbs. Most rendered views depend on it.
 - The `rome_login` route calls `views.login_page()`, which uses Django's `AuthenticationForm` and renders `rome_templates/login.html` with `home.css` and `login.css`. Successful login stays on this route even when a `next` destination was supplied. The page greets an authenticated user by first name, falling back to username. Login behavior is covered in `unit_tests/test_login.py`.
+- The welcome page includes annotation guidance, book and print links, an admin link for active staff, and a CSRF-protected sign-out form. `rome_app/lib/login_helpers.py` validates `next` against the website's editing routes; a valid destination is retained in the session for the optional Continue editing link. `views.logout_page()` accepts only POST and returns to the login form.
 - Book and print detail pages share `rome_templates/page_detail.html`, distinguished by `book_mode` and `print_mode` context flags.
 - Static production hosting uses a `/projects/rome/` prefix outside the Django route definitions. Do not add that prefix to `rome_app/urls_app.py`; settings and the hosting layer handle it.
 
