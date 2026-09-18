@@ -1,30 +1,74 @@
 {% extends "rome_templates/base.html" %}
+{% load static %}
 
 {% block title %}Login{% endblock title %}
 
-{% block page_heading %}<h1>Login</h1>{% endblock %}
+{% block extra_head %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% endblock %}
+
+{% block css_stylesheets %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'rome/css/login.css' %}" type="text/css" media="screen" />
+{% endblock %}
+
+{% block page_head %}
+<header class="login-header">
+    <h1><a href="{% url 'index' %}">{{ title }}</a></h1>
+</header>
+{% endblock %}
+
+{% block page_heading %}
+{% if user.is_authenticated %}
+<h2>Welcome, {{ user.first_name|default:user.get_username }}</h2>
+{% else %}
+<h2>Annotator Login</h2>
+{% endif %}
+{% endblock %}
 
 {% block content %}
 
-{% if form.errors %}
-<p>Your username and password didn't match. Please try again.</p>
-{% endif %}
-
-<form method="post" action="{% url 'rome_login' %}">
-{% csrf_token %}
-<table>
-<tr>
-    <td>{{ form.username.label_tag }}</td>
-    <td>{{ form.username }}</td>
-</tr>
-<tr>
-    <td>{{ form.password.label_tag }}</td>
-    <td>{{ form.password }}</td>
-</tr>
-</table>
-
-<input type="submit" value="login" />
-<input type="hidden" name="next" value="{{ next }}" />
+{% if user.is_authenticated %}
+<p class="login-status">You are logged in.</p>
+<p class="login-guidance">You can create and edit annotations on book pages and prints. Open a book page or print to find its annotation links.</p>
+<nav aria-label="Editing options">
+    <ul class="login-actions">
+        {% if continue_url %}
+        <li><a href="{{ continue_url }}">Continue editing</a></li>
+        {% endif %}
+        <li><a href="{% url 'books' %}">Browse books</a></li>
+        <li><a href="{% url 'prints' %}">Browse prints</a></li>
+        {% if user.is_active and user.is_staff %}
+        <li class="login-admin-action">
+            <a href="{% url 'admin:index' %}">Open admin</a>
+            <span class="login-admin-note">(You’re seeing this because your account also allows admin access.)</span>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+<form class="logout-form" method="post" action="{% url 'rome_logout' %}">
+    {% csrf_token %}
+    <button type="submit">Sign out</button>
 </form>
+{% else %}
+<form class="login-form" method="post" action="{% url 'rome_login' %}">
+    {% csrf_token %}
+    {% if continue_url %}<input type="hidden" name="next" value="{{ continue_url }}">{% endif %}
+    {% if form.non_field_errors %}
+    <div role="alert">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="login-field">
+        {{ form.username.label_tag }}
+        {{ form.username }}
+        {{ form.username.errors }}
+    </div>
+    <div class="login-field">
+        {{ form.password.label_tag }}
+        {{ form.password }}
+        {{ form.password.errors }}
+    </div>
+    <button type="submit">Log in</button>
+</form>
+{% endif %}
 
 {% endblock %}

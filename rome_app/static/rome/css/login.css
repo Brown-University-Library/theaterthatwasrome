@@ -1,0 +1,138 @@
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    font-size: 16px;
+}
+
+.login-header h1 {
+    max-height: none;
+}
+
+.login-header a {
+    color: #fff;
+}
+
+.login-header a:hover {
+    text-decoration: underline;
+}
+
+.login-header a:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 4px;
+}
+
+#page_body {
+    flex: 1;
+    width: 90%;
+    margin: 2.5rem 5%;
+}
+
+.login-form,
+.login-guidance {
+    max-width: 28rem;
+}
+
+#page_body h2 {
+    margin: 0 0 1.5rem;
+    padding-bottom: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+}
+
+#page_body p {
+    margin: 0;
+    line-height: 1.6;
+}
+
+#page_body .login-status {
+    margin-bottom: 0.75rem;
+}
+
+.login-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    margin: 1.25rem 0 1.75rem;
+    padding: 0;
+    list-style: none;
+}
+
+.login-actions a {
+    display: inline-block;
+    padding: 0.35rem 0;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    white-space: nowrap;
+}
+
+.login-admin-action {
+    white-space: nowrap;
+}
+
+@media (max-width: 64rem) {
+    .login-admin-action {
+        flex-basis: 100%;
+        white-space: normal;
+    }
+
+    .login-admin-note {
+        display: block;
+        max-width: 28rem;
+        line-height: 1.6;
+    }
+}
+
+.login-field {
+    margin-bottom: 1.25rem;
+}
+
+.login-field label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 500;
+}
+
+.login-field input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0.65rem;
+    border: 1px solid #70675d;
+    border-radius: 2px;
+    background: #fff;
+    color: #553512;
+    font: inherit;
+}
+
+button {
+    padding: 0.65rem 1.5rem;
+    border: 1px solid #803833;
+    border-radius: 2px;
+    background: #803833;
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #662d29;
+}
+
+.login-field input:focus-visible,
+.login-actions a:focus-visible,
+button:focus-visible {
+    outline: 2px solid #553512;
+    outline-offset: 3px;
+}
+
+.errorlist {
+    padding: 0;
+    color: #8f2d1e;
+    list-style: none;
+    line-height: 1.5;
+}
+
+#footer {
+    margin: 0;
+    padding: 1rem 5%;
+}

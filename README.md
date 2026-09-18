@@ -27,6 +27,11 @@ The main application is in `rome_app/`, including routes, views, models, forms, 
 - View the source repository: [Brown-University-Library/theaterthatwasrome](https://github.com/Brown-University-Library/theaterthatwasrome)
 
 
+### Website login and editing
+
+The public navigation currently has no login link. Logged-out visitors do not see the **Create New Annotation** or **Edit** links. Editors need to open the website login URL directly or use a bookmark (for example, `/rome/login/`). After signing in, they can browse to a book page or print and use its editing links.
+
+
 ## Local installation
 
 ### Prerequisites

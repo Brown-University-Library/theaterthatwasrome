@@ -3,54 +3,61 @@ import json
 import logging
 import pprint
 import re
-import requests
-import xml.etree.ElementTree as ET
 from operator import itemgetter, methodcaller
 
+import requests
 import trio
-
 from django.conf import settings
-from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError, HttpResponseRedirect
-from django.forms.formsets import formset_factory
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import mail_admins
 from django.core.paginator import Paginator
-from django.urls import reverse, reverse_lazy
+from django.forms.formsets import formset_factory
+from django.http import HttpRequest, HttpResponse, HttpResponseNotFound, HttpResponseRedirect, HttpResponseServerError
 from django.shortcuts import render
 from django.template.response import SimpleTemplateResponse
+from django.urls import reverse, reverse_lazy
 from django.utils.html import escape, escapejs
-from django.contrib.auth.decorators import login_required
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.debug import sensitive_post_parameters
+from django.views.decorators.http import require_POST, require_http_methods
 
-from .models import (
-        InvalidNameError,
-        Biography,
-        Document,
-        Essay,
-        Static,
-        Book,
-        Annotation,
-        Page,
-        annotations_by_books_and_prints,
-        Print,
-        Shop,
-        get_full_title_static,
-        zoom_viewer_url,
-        annotation_xml_url,
-    )
-from .app_settings import BDR_SERVER, BOOKS_PER_PAGE, PID_PREFIX, logger
-
-from rome_app.lib import version_helper
+from rome_app.lib import annotation_helpers, login_helpers, version_helper
 from rome_app.lib.version_helper import GatherCommitAndBranchData
+
+from .app_settings import BDR_SERVER, BOOKS_PER_PAGE, PID_PREFIX
+from .models import (
+    Annotation,
+    Biography,
+    Book,
+    Document,
+    Essay,
+    InvalidNameError,
+    Page,
+    Print,
+    Shop,
+    Static,
+    annotation_xml_url,
+    annotations_by_books_and_prints,
+    get_full_title_static,
+    zoom_viewer_url,
+)
+
+logger = logging.getLogger('rome')
 
 
 def temp_roles_checker(request):
     """ Checks biography-roles against Roles table.
         Called by `__main__`. """
-    log.debug( '\n\nstarting temp_roles_checker()' )
+    logger.debug( '\n\nstarting temp_roles_checker()' )
     from rome_app.lib import roles_checker
     problems = roles_checker.run_code()
     data = {
-        '__meta__': { 'bios_with_issues_count': len(problems), 'timestamp': str(datetime.datetime.now()) }, 
+        '__meta__': { 'bios_with_issues_count': len(problems), 'timestamp': str(datetime.datetime.now().astimezone()) },
         'data': problems
         }
     jsn = json.dumps( data, sort_keys=False, indent=2 )
@@ -66,7 +73,7 @@ def first_word(s): return s.split(" ")[0] if s else ""
 
 
 def std_context(path, style="rome/css/content.css",title="The Theater that was Rome"):
-    pathparts = path.split(u'/')
+    pathparts = path.split('/')
     url = reverse('index')
     breadcrumbs = [{'url': url, 'name': 'The Theater that was Rome'}]
 
@@ -74,7 +81,7 @@ def std_context(path, style="rome/css/content.css",title="The Theater that was R
         if node:
             if node == 'rome' or node == 'projects':
                 continue
-            url += node + u'/'
+            url += node + '/'
             obj = {"url": url, "name":node.title()}
             breadcrumbs.append(obj)
 
@@ -89,6 +96,49 @@ def std_context(path, style="rome/css/content.css",title="The Theater that was R
     context['page_documentation']=""
     context['breadcrumbs']=breadcrumbs
     return context
+
+
+@sensitive_post_parameters()
+@never_cache
+@csrf_protect
+@require_http_methods(['GET', 'HEAD', 'POST'])
+def login_page(request: HttpRequest) -> HttpResponse:
+    """
+    Displays the website login form and a welcome message after login.
+    Called by: django.core.handlers.base.BaseHandler._get_response()
+    """
+    next_url = request.POST.get('next', request.GET.get('next', ''))
+    if request.user.is_authenticated and not next_url:
+        next_url = request.session.get('rome_login_continue', '')
+    continue_url = login_helpers.editing_destination(next_url)
+    form = AuthenticationForm(request, data=request.POST if request.method == 'POST' else None)
+    user = None
+    if request.method == 'POST' and form.is_valid():
+        user = form.get_user()
+
+    response: HttpResponse
+    if user is not None:
+        auth_login(request, user)
+        request.session['rome_login_continue'] = continue_url
+        response = HttpResponseRedirect(reverse('rome_login'))
+    else:
+        context: dict[str, object] = std_context(request.path, style='rome/css/home.css')
+        context['form'] = form
+        context['continue_url'] = continue_url
+        response = render(request, 'rome_templates/login.html', context)
+    return response
+
+
+@never_cache
+@csrf_protect
+@require_POST
+def logout_page(request: HttpRequest) -> HttpResponse:
+    """
+    Signs the user out and returns to the website login form.
+    Called by: django.core.handlers.base.BaseHandler._get_response()
+    """
+    auth_logout(request)
+    return HttpResponseRedirect(reverse('rome_login'))
 
 
 def index(request):
@@ -122,9 +172,8 @@ def book_list(request):
         buonanno = "+NOT+(note:buonanno)"
     try:
         book_list = Book.search(query="genre_aat:book*"+buonanno)
-    except Exception as e:
-        # logger.error(f'book_list view error getting book_list data: {e}')
-        logger.exception(f'book_list view error getting book_list data: {e}')
+    except Exception:
+        logger.exception('book_list view error getting book_list data')
         return HttpResponse('error loading list of books', status=500)
     sort_by = Book.SORT_OPTIONS.get(sort_by, 'title_sort')
     book_list=sorted(book_list,key=methodcaller('sort_key', sort_by))
@@ -160,29 +209,20 @@ def book_detail(request, book_id):
     book_list_sort_by = request.GET.get('book_list_sort_by', 'title')
     context = std_context(request.path)
     #Back to list HREF
-    context['back_to_book_href'] = u'%ssort_by=%s?page=%s?' % (reverse('books'), book_list_sort_by, book_list_page)
-    book = Book.get_or_404(pid="%s:%s" % (PID_PREFIX, book_id))
+    context['back_to_book_href'] = '{}sort_by={}?page={}?'.format(reverse('books'), book_list_sort_by, book_list_page)
+    book = Book.get_or_404(pid=f"{PID_PREFIX}:{book_id}")
     context['book'] = book
     context['essays'] = book.essays()
 
     context['breadcrumbs'][-1]['name'] = breadcrumb_detail(context)
     grp = 20 # group size for lookups
     pages = context['book'].pages()
-    pid_groups = [["%s:%s" % (PID_PREFIX, x.id) for x in pages[i:i+grp]] for i in range(0, len(pages), grp)]
+    pid_groups = [[f"{PID_PREFIX}:{x.id}" for x in pages[i:i+grp]] for i in range(0, len(pages), grp)]
     url = "https://%s/api/search?q=%s+AND+display:BDR_PUBLIC&fl=rel_is_annotation_of_ssim&rows=6000&callback=mark_annotated"
     annot_lookups = [url % (BDR_SERVER, "rel_is_annotation_of_ssim:(\"" + ("\"+OR+\"".join(l)) + "\")") for l in pid_groups]
     context['annot_lookups'] = annot_lookups
     return render(request, 'rome_templates/book_detail.html', context)
 
-
-def _fetch_url_content(url):
-    logger.debug( f'starting non-top-level-view _fetch_url_content with url, ``{url}``' )
-    r = requests.get(url, timeout=60)
-    if r.ok:
-        return r
-    else:
-        logger.error(f'error retrieving {url}: {r.status_code} - {r.text}')
-        raise Exception(f'{r.status_code}')
 
 
 def page_detail(request, page_id: str, book_id=None):  # book_id will be type str or None
@@ -191,13 +231,13 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
     # logger.debug( f'type(book_id), ``{type(book_id)}``; book_id, ``{book_id}``' )
     assert type( page_id ) == str
     assert type( book_id ) in [ str, type(None )]
-    page_pid = '%s:%s' % (PID_PREFIX, page_id)
+    page_pid = f'{PID_PREFIX}:{page_id}'
     this_page = Page.get_or_404(page_pid)
     context = std_context(request.path, )
     if book_id:
-        book_pid = '%s:%s' % (PID_PREFIX, book_id)
+        book_pid = f'{PID_PREFIX}:{book_id}'
     else:
-        book_pid: str = _get_book_pid_from_page_pid(u'%s' % page_pid)
+        book_pid: str = _get_book_pid_from_page_pid(f'{page_pid}')
         book_id = book_pid.split(':')[-1]
     if not book_id:
         return HttpResponseNotFound('Book for this page not found.')
@@ -211,8 +251,8 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
     context['book_mode'] = 1
     context['print_mode'] = 0
     if book_list_page:
-        context['back_to_book_href'] = u'%s?page=%s' % (reverse('books'), book_list_page)
-        context['back_to_thumbnail_href'] = u'%s?book_list_page=%s' % (reverse('thumbnail_viewer', kwargs={'book_id':book_id}), book_list_page)
+        context['back_to_book_href'] = '{}?page={}'.format(reverse('books'), book_list_page)
+        context['back_to_thumbnail_href'] = '{}?book_list_page={}'.format(reverse('thumbnail_viewer', kwargs={'book_id':book_id}), book_list_page)
     else:
         context['back_to_book_href'] = reverse('books')
         context['back_to_thumbnail_href'] = reverse('thumbnail_viewer', kwargs={'book_id':book_id})
@@ -220,10 +260,10 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
     context['studio_url'] = this_page.studio_uri
     context['book_id'] = book_id
 
-    book_json_uri = 'https://%s/api/items/%s/' % (BDR_SERVER, book_pid)
+    book_json_uri = f'https://{BDR_SERVER}/api/items/{book_pid}/'
     try:
-        r = _fetch_url_content(book_json_uri)
-    except Exception:
+        r = annotation_helpers.fetch_url_content(book_json_uri)
+    except requests.RequestException:
         return HttpResponseServerError('Error retrieving content.')
     book_json = json.loads(r.text)
     context['short_title'] = book_json['brief']['title']
@@ -237,14 +277,14 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
             else:
                 authors += author_list[i]+"; "
         context['authors'] = authors
-    except Exception:
+    except (KeyError, TypeError):
         context['authors'] = "contributor(s) not available"
     try:
         context['date'] = book_json['dateIssued'][0:4]
-    except Exception:
+    except (KeyError, TypeError):
         try:
             context['date'] = book_json['dateCreated'][0:4]
-        except Exception:
+        except (KeyError, TypeError):
             context['date'] = "n.d."
     context['note'] = "no note"
     try:
@@ -257,7 +297,10 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
     context['breadcrumbs'][-2]['name'] = breadcrumb_detail(context, view="print")
 
     # annotations/metadata
-    annotations = this_page.relations['hasAnnotation']
+    relations = this_page.data.get('relations')
+    annotations = relations.get('hasAnnotation') if isinstance(relations, dict) else None
+    if not isinstance(annotations, list):
+        annotations = []
     context['has_annotations'] = len(annotations)
     context['annotation_uris'] = []
     context['annotations'] = []
@@ -269,7 +312,7 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
         annot_xml_uri = annotation_xml_url(annotation['pid'])
         context['annotation_uris'].append(annot_xml_uri)
         annotation['xml_uri'] = annot_xml_uri
-        curr_annot = get_annotation_detail(annotation)
+        curr_annot = annotation_helpers.get_annotation_detail(annotation)
         context['annotations'].append(curr_annot)
     if(context['annotations']):
         context['annotations'] = sorted(context['annotations'], key=lambda annote: annotation_order(annote))
@@ -279,91 +322,13 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
     context['next_pid'] = next_id
     context['essays'] = this_page.essays()
 
-    context['breadcrumbs'][-1]['name'] = "Image " + this_page.rel_has_pagination_ssim[0]
+    pagination = this_page.data.get('rel_has_pagination_ssim')
+    page_label = page_id
+    if isinstance(pagination, list) and pagination and isinstance(pagination[0], str) and pagination[0]:
+        page_label = pagination[0]
+    context['breadcrumbs'][-1]['name'] = f'Image {page_label}'
     return render(request, 'rome_templates/page_detail.html', context)
 
-
-def _get_annotation_name_info(mods_name):
-    logger.debug( f'starting non-top-level-view _get_annotation_name_info() for mods_name, ``{mods_name}``' )
-    trp_id = Annotation.trp_id_from_name_node(mods_name)
-    return {
-        'name': mods_name[0].text,
-        'role': mods_name[1][0].text.capitalize() if(mods_name[1][0].text) else "Contributor",
-        'trp_id': trp_id,
-    }
-
-def get_annotation_detail(annotation):
-    logger.debug( 'starting non-top-level-view get_annotation_detail() for annotation, ``{annotation}``' )
-    curr_annot={}
-    curr_annot['xml_uri'] = annotation['xml_uri']
-    if 'edit_link' in annotation:
-        curr_annot['edit_link'] = annotation['edit_link']
-    curr_annot['has_elements'] = {'inscriptions':0, 'annotations':0, 'annotator':0, 'origin':0, 'title':0, 'abstract':0, 'genre':0}
-
-    r = _fetch_url_content(curr_annot['xml_uri'])
-    root = ET.fromstring(r.content)
-    for title in root.iter('{http://www.loc.gov/mods/v3}titleInfo'):
-        if 'lang' in title.attrib and title.attrib['lang'] == 'en':
-            curr_annot['title'] = title[0].text if title[0].text else ""
-        else:
-            curr_annot['orig_title'] = title[0].text if title[0].text else "[No Title]"
-        curr_annot['has_elements']['title'] += 1
-
-    curr_annot['names'] = []
-    for name in root.iter('{http://www.loc.gov/mods/v3}name'):
-        name_info = _get_annotation_name_info(name)
-        if not name_info['trp_id']:
-            mail_admins(subject='TTWR annotation error',
-                    message=f'{annotation["pid"]} annotation missing trp_id: {name_info}')
-        curr_annot['names'].append(name_info)
-    curr_annot['names'] = sorted(curr_annot['names'], key=itemgetter("role", "name"))
-    for abstract in root.iter('{http://www.loc.gov/mods/v3}abstract'):
-        curr_annot['abstract']=abstract.text
-        curr_annot['has_elements']['abstract']=1
-    for genre in root.iter('{http://www.loc.gov/mods/v3}genre'):
-        curr_annot['genre'] = genre.text
-        curr_annot['has_elements']['genre']=1
-    for origin in root.iter('{http://www.loc.gov/mods/v3}originInfo'):
-        try:
-            for impression in origin.iter('{http://www.loc.gov/mods/v3}dateOther'):
-                try:
-                    curr_annot['impression']=impression.text
-                    if impression.text != None:
-                        curr_annot['has_elements']['impression']=1
-                except Exception:
-                    pass
-            curr_annot['origin']=origin[0].date
-            curr_annot['has_elements']['origin']=1
-        except Exception:
-            pass
-    for impression in root.iter('{http://www.loc.gov/mods/v3}dateOther'):
-        try:
-            if impression.attrib['type'] == "impression":
-                curr_annot['impression']=impression[0].text
-                curr_annot['has_elements']['impression']=1
-        except Exception:
-            pass
-    curr_annot['inscriptions'] = []
-    curr_annot['annotations'] = []
-    curr_annot['annotator'] = ""
-    for note in root.iter('{http://www.loc.gov/mods/v3}note'):
-        curr_note={}
-        for att in note.attrib:
-            curr_note[att]=note.attrib[att]
-        if note.text:
-            curr_note['text']=note.text
-        if curr_note['type'].lower()=='inscription' and note.text:
-            curr_annot['inscriptions'].append(curr_note['displayLabel']+": "+curr_note['text'])
-            curr_annot['has_elements']['inscriptions']=1
-        elif curr_note['type'].lower()=='annotation' and note.text:
-            curr_annot['annotations'].append(curr_note['displayLabel']+": "+curr_note['text'])
-            curr_annot['has_elements']['annotations']=1
-        elif curr_note['type'].lower()=='resp' and note.text:
-            #display for the first annotator; ignore later annotators for now
-            if not curr_annot['annotator']:
-                curr_annot['annotator'] = note.text
-                curr_annot['has_elements']['annotator'] = 1
-    return curr_annot
 
 
 def print_list(request):
@@ -409,7 +374,7 @@ def print_list(request):
 # @xframe_options_exempt
 def print_detail(request, print_id):
     logger.debug( '\n\nstarting print_detail()' )
-    print_pid = '%s:%s' % (PID_PREFIX, print_id)
+    print_pid = f'{PID_PREFIX}:{print_id}'
     context = std_context(request.path, )
 
     if request.user.is_authenticated:
@@ -422,17 +387,17 @@ def print_detail(request, print_id):
     context['print_mode'] = 1
     context['det_img_view_src'] = zoom_viewer_url(print_pid)
     if prints_list_page:
-        context['back_to_print_href'] = u'%s?page=%s&collection=%s' % (reverse('prints'), prints_list_page, collection)
+        context['back_to_print_href'] = '{}?page={}&collection={}'.format(reverse('prints'), prints_list_page, collection)
     else:
         context['back_to_print_href'] = reverse('prints')
 
     context['print_id'] = print_id
-    context['studio_url'] = 'https://%s/studio/item/%s/' % (BDR_SERVER, print_pid)
+    context['studio_url'] = f'https://{BDR_SERVER}/studio/item/{print_pid}/'
 
-    json_uri = 'https://%s/api/items/%s/' % (BDR_SERVER, print_pid)
+    json_uri = f'https://{BDR_SERVER}/api/items/{print_pid}/'
     try:
-        r = _fetch_url_content(json_uri)
-    except Exception:
+        r = annotation_helpers.fetch_url_content(json_uri)
+    except requests.RequestException:
         return HttpResponseServerError('error retrieving content')
     print_json = json.loads(r.text)
     context['short_title'] = print_json['brief']['title']
@@ -446,14 +411,14 @@ def print_detail(request, print_id):
             else:
                 authors+=author_list[i]+"; "
         context['authors']=authors
-    except Exception:
+    except (KeyError, TypeError):
         context['authors']="contributor(s) not available"
     try:
         context['date'] = print_json['dateIssued'][0:4]
-    except Exception:
+    except (KeyError, TypeError):
         try:
             context['date']=print_json['dateCreated'][0:4]
-        except Exception:
+        except (KeyError, TypeError):
             context['date']="n.d."
 
     # annotations/metadata
@@ -469,7 +434,7 @@ def print_detail(request, print_id):
         if request.user.is_authenticated:
             link = reverse('edit_print_annotation', kwargs={'print_id': print_id, 'anno_id': anno_id})
             annotation['edit_link'] = link
-        curr_annot = get_annotation_detail(annotation)
+        curr_annot = annotation_helpers.get_annotation_detail(annotation)
         context['annotations'].append(curr_annot)
 
     context['breadcrumbs'][-1]['name'] = breadcrumb_detail(context, view="print")
@@ -480,14 +445,14 @@ def print_detail(request, print_id):
 def biography_detail(request, trp_id):
     logger.debug( '\n\nstarting biography_detail()' )
     #view that pull bio information from the db, instead of the BDR
-    trp_id = "%04d" % int(trp_id)
+    trp_id = f'{int(trp_id):04d}'
     logger.debug( f'trp_id, ``{trp_id}``' )
     try:
         bio = Biography.objects.get(trp_id=trp_id)
         logger.debug( f'bio found in db lookup, ``{bio}``' )
     except ObjectDoesNotExist:
-        logger.debug( f'bio not found' )
-        return HttpResponseNotFound('Person %s Not Found' % trp_id)
+        logger.debug( 'bio not found' )
+        return HttpResponseNotFound(f'Person {trp_id} Not Found')
     context = std_context(request.path, title="The Theater that was Rome - Biography")
     logger.debug( f'initial context, ``{pprint.pformat(context)}``' )
     context['bio'] = bio
@@ -524,8 +489,8 @@ def biography_detail(request, trp_id):
 
 def _get_book_pid_from_page_pid( page_pid: str ) -> str:
     logger.debug( f'starting _get_book_pid_from_page_pid() for page_pid, ``{page_pid}``' )
-    query = u'https://%s/api/items/%s/' % (BDR_SERVER, page_pid)
-    r = _fetch_url_content(query)
+    query = f'https://{BDR_SERVER}/api/items/{page_pid}/'
+    r = annotation_helpers.fetch_url_content(query)
     data = json.loads(r.text)
     if data['relations']['isPartOf']:
         return data['relations']['isPartOf'][0]['pid']
@@ -536,28 +501,23 @@ def _get_book_pid_from_page_pid( page_pid: str ) -> str:
         return ''
 
 
-def filter_bios(fq, bio_list):
-    logger.debug( f'starting filter_bios()' )
-    return [b for b in bio_list if (b.roles and fq in b.roles)]
-
-
 def biography_list(request):
     logger.debug( '\n\nstarting biography_list()' )
     fq = request.GET.get('filter', 'all')
 
-    bio_list = Biography.objects.all()
+    bio_list = list(Biography.objects.values('trp_id', 'name', 'birth_date', 'death_date', 'roles'))
     logger.debug( f'bio_list, ``{pprint.pformat(bio_list)}``' )
 
-    role_set = set()
+    role_set: set[str] = set()
 
     for bio in bio_list:
-        if bio.roles:
-            bio.roles = [role.strip(" ") for role in bio.roles.split(';') if role.strip(" ") != '']
-            role_set |= set(bio.roles)
+        roles = bio['roles'] or ''
+        bio['roles'] = [role.strip(' ') for role in roles.split(';') if role.strip(' ')]
+        role_set.update(bio['roles'])
     logger.debug( f'role_set, ``{pprint.pformat(role_set)}``' )
 
     if fq != 'all':
-        bio_list = filter_bios(fq, bio_list)
+        bio_list = [bio for bio in bio_list if fq in bio['roles']]
 
     bios_per_page=30
     PAGIN=Paginator(bio_list,bios_per_page)
@@ -609,13 +569,11 @@ def shops(request):
 def shop_list(request):
     logger.debug( '\n\nstarting shop_list()' )
     context=std_context(request.path, style="rome/css/links.css")
-    shop_objs = Shop.objects.order_by('family')
-    family_set = set()
+    shop_objs = list(Shop.objects.order_by('family').values('slug', 'title', 'family', 'start_date', 'end_date'))
 
     for shop in shop_objs:
-        if shop.family:
-            shop.family = [family.strip(" ") for family in shop.family.split(';') if family.strip(" ") != '']
-            family_set |= set(shop.family)
+        families = shop['family'] or ''
+        shop['family'] = [family.strip(' ') for family in families.split(';') if family.strip(' ')]
 
     context['shop_objs'] = shop_objs
     context['num_results']= len(shop_objs)
@@ -629,7 +587,7 @@ def shop_detail(request, shop_slug):
     try:
         shop = Shop.objects.get(slug=shop_slug)
     except ObjectDoesNotExist:
-        return HttpResponseNotFound('Shop %s Not Found' % shop_slug)
+        return HttpResponseNotFound(f'Shop {shop_slug} Not Found')
     context=std_context(request.path, style="rome/css/essays.css")
     context['shop_text'] = shop.text
     context['shop'] = shop
@@ -651,9 +609,8 @@ def shop_detail(request, shop_slug):
         if 'rel_is_part_of_ssim' in work:
             current_work['ppid'] = work['rel_is_part_of_ssim'][0].split(":")[-1]
         for work in related_list:
-            if ('ppid' in work) and ('ppid' in current_work):
-                if current_work['ppid'] == work['ppid']:
-                    current_work['sibling'] = True
+            if ('ppid' in work) and ('ppid' in current_work) and current_work['ppid'] == work['ppid']:
+                current_work['sibling'] = True
         if (current_work['sibling'] == False):     
             related_list.append(current_work)
         thumbnails_list.append(current_work)
@@ -667,16 +624,16 @@ def essay_list(request):
     context=std_context(request.path, style="rome/css/links.css")
     context['page_documentation']='Listed below are essays on topics that relate to the Theater that was Rome collection of books and engravings. The majority of the essays were written by students in Brown University classes that used this material, and edited by Prof. Evelyn Lincoln.'
     essay_objs = Essay.objects.all()
-    context['essay_objs'] = essay_objs
     context['num_results']=len(essay_objs)
     #temporary, until i figure out how to define an ESSAYS_PER_PAGE variable
     context['results_per_page'] = len(essay_objs)
     page = request.GET.get('page', 1)
     context['curr_page'] = page
    
+    essay_entries: list[dict[str, object]] = []
     for essay in essay_objs:
-        essay.thumbs = []
-        essay.related_list=[]
+        thumbs: list[list[str]] = []
+        related_list = []
         for work in essay.related_works():
             current_work={}
             current_work['title']=work['primary_title']
@@ -689,9 +646,18 @@ def essay_list(request):
             current_work['pid']=work['pid'].split(":")[-1]
             if 'rel_is_part_of_ssim' in work:
                 current_work['ppid'] = work['rel_is_part_of_ssim'][0].split(":")[-1]
-                essay.thumbs.append([current_work['ppid'], current_work['pid']])
-            essay.related_list.append(current_work)
-            essay.thumbs = essay.thumbs[:5]
+                thumbs.append([current_work['ppid'], current_work['pid']])
+            related_list.append(current_work)
+        essay_entries.append({
+            'author': essay.author,
+            'title': essay.title,
+            'slug': essay.slug,
+            'preview': essay.preview(),
+            'is_note': essay.is_note,
+            'thumbs': thumbs[:5],
+            'related_list': related_list,
+        })
+    context['essay_objs'] = essay_entries
     return render(request, 'rome_templates/essay_list.html', context)
 
 
@@ -700,7 +666,7 @@ def essay_detail(request, essay_slug):
     try:
         essay = Essay.objects.get(slug=essay_slug)
     except ObjectDoesNotExist:
-        return HttpResponseNotFound('Essay %s Not Found' % essay_slug)
+        return HttpResponseNotFound(f'Essay {essay_slug} Not Found')
     context=std_context(request.path, style="rome/css/essays.css")
     context['essay_text'] = essay.text
     context['essay'] = essay
@@ -721,9 +687,8 @@ def essay_detail(request, essay_slug):
         if 'rel_is_part_of_ssim' in work:
             current_work['ppid'] = work['rel_is_part_of_ssim'][0].split(":")[-1]
         for work in related_list:
-            if ('ppid' in work) and ('ppid' in current_work):
-                if current_work['ppid'] == work['ppid']:
-                    current_work['sibling'] = True
+            if ('ppid' in work) and ('ppid' in current_work) and current_work['ppid'] == work['ppid']:
+                current_work['sibling'] = True
         if (current_work['sibling'] == False):     
             related_list.append(current_work)
         thumbnails_list.append(current_work)
@@ -742,7 +707,7 @@ def document_detail(request, document_slug):
     try:
         document = Document.objects.get(slug=document_slug)
     except ObjectDoesNotExist:
-        return HttpResponseNotFound('Document %s Not Found' % document_slug)
+        return HttpResponseNotFound(f'Document {document_slug} Not Found')
     context = std_context(request.path, style="rome/css/essays.css")
     context['document'] = document
     context['people'] = document.people.all()
@@ -751,7 +716,7 @@ def document_detail(request, document_slug):
 
 
 def breadcrumb_detail(context, view="book", title_words=4):
-    logger.debug( f'starting non-top-level-view breadcrumb_detail()' )
+    logger.debug( 'starting non-top-level-view breadcrumb_detail()' )
     if(view == "book"):
         return " ".join(context['book'].title().split(" ")[0:title_words]) + " . . ."
 
@@ -765,9 +730,9 @@ def breadcrumb_detail(context, view="book", title_words=4):
 def search_page(request):
     logger.debug( '\n\nstarting search_page()' )
     context = std_context(request.path, style= "rome/css/links.css")
-    searchquery = 'https://%s/api/search/?q=rel_is_member_of_collection_ssim:"%s"+object_type:annotation+display:BDR_PUBLIC' % (BDR_SERVER, settings.TTWR_COLLECTION_PID)
-    thumbnailquery = "https://%s/viewers/image/thumbnail/" % (BDR_SERVER)
-    pagequery = "https://%s/api/items/" % (BDR_SERVER)
+    searchquery = f'https://{BDR_SERVER}/api/search/?q=rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"+object_type:annotation+display:BDR_PUBLIC'
+    thumbnailquery = f"https://{BDR_SERVER}/viewers/image/thumbnail/"
+    pagequery = f"https://{BDR_SERVER}/api/items/"
     context["searchquery"] = searchquery
     context["thumbnailquery"] = thumbnailquery
     context["pagequery"] = pagequery
@@ -776,9 +741,8 @@ def search_page(request):
 
 @login_required(login_url=reverse_lazy('rome_login'))
 def new_annotation(request, book_id, page_id):
-    logger
-    page_pid = '%s:%s' % (PID_PREFIX, page_id)
-    from .forms import AnnotationForm, PersonForm, InscriptionForm
+    page_pid = f'{PID_PREFIX}:{page_id}'
+    from .forms import AnnotationForm, InscriptionForm, PersonForm
     PersonFormSet = formset_factory(PersonForm)
     InscriptionFormSet = formset_factory(InscriptionForm)
     if request.method == 'POST':
@@ -787,18 +751,16 @@ def new_annotation(request, book_id, page_id):
         inscription_formset = InscriptionFormSet(request.POST, prefix='inscriptions')
         if form.is_valid() and person_formset.is_valid() and inscription_formset.is_valid():
             if request.user.first_name:
-                annotator = u'%s %s' % (request.user.first_name, request.user.last_name)
+                annotator = f'{request.user.first_name} {request.user.last_name}'
             else:
-                annotator = u'%s' % request.user.username
+                annotator = f'{request.user.username}'
             annotation = Annotation.from_form_data(page_pid, annotator, form.cleaned_data, person_formset.cleaned_data, inscription_formset.cleaned_data)
             try:
                 response = annotation.save_to_bdr()
-                logger.info('%s added annotation %s for %s' % (request.user.username, response['pid'], page_id))
+                logger.info('{} added annotation {} for {}'.format(request.user.username, response['pid'], page_id))
                 return HttpResponseRedirect(reverse('book_page_viewer', kwargs={'book_id': book_id, 'page_id': page_id}))
-            except Exception as e:
-                logger.error('error saving new annotation:')
-                import traceback
-                logger.error(traceback.format_exc())
+            except Exception:
+                logger.exception('error saving new annotation')
                 return HttpResponseServerError('Internal server error. Check log.')
     else:
         inscription_formset = InscriptionFormSet(prefix='inscriptions')
@@ -813,8 +775,8 @@ def new_annotation(request, book_id, page_id):
 @login_required(login_url=reverse_lazy('rome_login'))
 def new_print_annotation(request, print_id):
     logger.debug( '\n\nstarting new_print_annotation()' )
-    print_pid = '%s:%s' % (PID_PREFIX, print_id)
-    from .forms import AnnotationForm, PersonForm, InscriptionForm
+    print_pid = f'{PID_PREFIX}:{print_id}'
+    from .forms import AnnotationForm, InscriptionForm, PersonForm
     PersonFormSet = formset_factory(PersonForm)
     InscriptionFormSet = formset_factory(InscriptionForm)
     if request.method == 'POST':
@@ -823,16 +785,16 @@ def new_print_annotation(request, print_id):
         inscription_formset = InscriptionFormSet(request.POST, prefix='inscriptions')
         if form.is_valid() and person_formset.is_valid() and inscription_formset.is_valid():
             if request.user.first_name:
-                annotator = u'%s %s' % (request.user.first_name, request.user.last_name)
+                annotator = f'{request.user.first_name} {request.user.last_name}'
             else:
-                annotator = u'%s' % request.user.username
+                annotator = f'{request.user.username}'
             annotation = Annotation.from_form_data(print_pid, annotator, form.cleaned_data, person_formset.cleaned_data, inscription_formset.cleaned_data)
             try:
                 response = annotation.save_to_bdr()
-                logger.info('%s added annotation %s for %s' % (request.user.username, response['pid'], print_id))
+                logger.info('{} added annotation {} for {}'.format(request.user.username, response['pid'], print_id))
                 return HttpResponseRedirect(reverse('specific_print', kwargs={'print_id': print_id}))
-            except Exception as e:
-                logger.error(str(e))
+            except Exception:
+                logger.exception('error saving new print annotation')
                 return HttpResponseServerError('Internal server error. Check log.')
     else:
         inscription_formset = InscriptionFormSet(prefix='inscriptions')
@@ -854,7 +816,7 @@ def get_bound_edit_forms(annotation, AnnotationForm, PersonFormSet, InscriptionF
 
 def edit_annotation_base(request, image_pid, anno_pid, redirect_url):
     logger.debug( '\n\nstarting edit_annotation_base()' )
-    from .forms import AnnotationForm, PersonForm, InscriptionForm
+    from .forms import AnnotationForm, InscriptionForm, PersonForm
     PersonFormSet = formset_factory(PersonForm)
     InscriptionFormSet = formset_factory(InscriptionForm)
     context_data = {}
@@ -867,16 +829,16 @@ def edit_annotation_base(request, image_pid, anno_pid, redirect_url):
         if form.is_valid() and person_formset.is_valid() and inscription_formset.is_valid():
             #update the annotator to be the person making this edit
             if request.user.first_name:
-                annotator = u'%s %s' % (request.user.first_name, request.user.last_name)
+                annotator = f'{request.user.first_name} {request.user.last_name}'
             else:
-                annotator = u'%s' % request.user.username
+                annotator = f'{request.user.username}'
             annotation.add_form_data(annotator, form.cleaned_data, person_formset.cleaned_data, inscription_formset.cleaned_data)
             try:
-                response = annotation.update_in_bdr()
-                logger.info('%s edited annotation %s' % (request.user.username, anno_pid))
+                annotation.update_in_bdr()
+                logger.info(f'{request.user.username} edited annotation {anno_pid}')
                 return HttpResponseRedirect(redirect_url)
-            except Exception as e:
-                logger.error(str(e))
+            except Exception:
+                logger.exception('error updating annotation')
                 return HttpResponseServerError('Internal server error. Check log.')
         else:
             context_data.update({'form': form, 'person_formset': person_formset, 'inscription_formset': inscription_formset})
@@ -887,10 +849,8 @@ def edit_annotation_base(request, image_pid, anno_pid, redirect_url):
             mail_admins(subject='TTWR create/edit annotation error',
                     message=f'exception: {e}', fail_silently=False)
             return HttpResponse('Existing annotation is invalid. Email has been sent to bdr@brown.edu.')
-        except Exception as e:
-            logger.error('loading data to edit %s: %s' % (anno_pid, e))
-            import traceback
-            logger.error(traceback.format_exc())
+        except Exception:
+            logger.exception(f'error loading annotation, ``{anno_pid}``')
             return HttpResponseServerError('Internal server error.')
 
     image_link = zoom_viewer_url(image_pid)
@@ -901,16 +861,16 @@ def edit_annotation_base(request, image_pid, anno_pid, redirect_url):
 @login_required(login_url=reverse_lazy('rome_login'))
 def edit_annotation(request, book_id, page_id, anno_id):
     logger.debug( '\n\nstarting edit_annotation()' )
-    anno_pid = '%s:%s' % (PID_PREFIX, anno_id)
-    page_pid = '%s:%s' % (PID_PREFIX, page_id)
+    anno_pid = f'{PID_PREFIX}:{anno_id}'
+    page_pid = f'{PID_PREFIX}:{page_id}'
     return edit_annotation_base(request, page_pid, anno_pid, reverse('book_page_viewer', kwargs={'book_id': book_id, 'page_id': page_id}))
 
 
 @login_required(login_url=reverse_lazy('rome_login'))
 def edit_print_annotation(request, print_id, anno_id):
     logger.debug( '\n\nstarting edit_print_annotation()' )
-    anno_pid = '%s:%s' % (PID_PREFIX, anno_id)
-    print_pid = '%s:%s' % (PID_PREFIX, print_id)
+    anno_pid = f'{PID_PREFIX}:{anno_id}'
+    print_pid = f'{PID_PREFIX}:{print_id}'
     return edit_annotation_base(request, print_pid, anno_pid, reverse('specific_print', kwargs={'print_id': print_id}))
 
 
@@ -971,7 +931,7 @@ def new_biography(request):
 
 
 def _get_prev_next_ids(book_json, page_pid):
-    logger.debug( f'starting non-top-level-view _get_prev_next_ids()' )
+    logger.debug( 'starting non-top-level-view _get_prev_next_ids()' )
     prev_id = "none"
     next_id = "none"
     for index, page in enumerate(book_json['relations']['hasPart']):
@@ -990,7 +950,7 @@ def _get_prev_next_ids(book_json, page_pid):
 def version( request ):
     """ Returns basic branch and commit data. """
     logger.debug( '\n\nstarting version()' )
-    rq_now = datetime.datetime.now()
+    rq_now = datetime.datetime.now().astimezone()
     gatherer = GatherCommitAndBranchData()
     trio.run( gatherer.manage_git_calls )
     commit = gatherer.commit
