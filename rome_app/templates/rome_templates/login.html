@@ -22,7 +22,7 @@
 {% if user.is_authenticated %}
 <h2>Welcome, {{ user.first_name|default:user.get_username }}</h2>
 {% else %}
-<h2>Login</h2>
+<h2>Annotator Login</h2>
 {% endif %}
 {% endblock %}
 
