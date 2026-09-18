@@ -1,4 +1,8 @@
-import datetime, json, logging, os, pprint, subprocess
+import datetime
+import logging
+import os
+import pprint
+import subprocess
 
 import trio
 from django.conf import settings
@@ -11,17 +15,16 @@ def make_context( request, rq_now, info_txt ):
         Called by views.version() """
     context = {
         'request': {
-        'url': '%s://%s%s' % (
-            request.scheme,
-            request.META.get( 'HTTP_HOST', '127.0.0.1' ),  # HTTP_HOST doesn't exist for client-tests
-            request.META.get('REQUEST_URI', request.META['PATH_INFO'])
-            ),
+        'url': (
+            f"{request.scheme}://{request.META.get('HTTP_HOST', '127.0.0.1')}"
+            f"{request.META.get('REQUEST_URI', request.META['PATH_INFO'])}"
+        ),
         'timestamp': str( rq_now )
         },
         'response': {
             'ip': request.META.get('REMOTE_ADDR', 'unknown'),
             'version': info_txt,
-            'timetaken': str( datetime.datetime.now() - rq_now )
+            'timetaken': str( datetime.datetime.now(tz=rq_now.tzinfo) - rq_now )
         }
     }
     return context
@@ -45,7 +48,6 @@ class GatherCommitAndBranchData:
         log.debug( f'final results_holder_dct, ```{pprint.pformat(results_holder_dct)}```' )
         self.commit = results_holder_dct['commit']
         self.branch = results_holder_dct['branch']
-        return
 
     async def fetch_commit_data( self, results_holder_dct ):
         """ Fetches commit-data.
@@ -60,7 +62,6 @@ class GatherCommitAndBranchData:
         lines = output.split( '\n' )
         commit = lines[0]
         results_holder_dct['commit'] = commit
-        return
 
     async def fetch_branch_data( self, results_holder_dct ):
         """ Fetches branch-data.
@@ -79,6 +80,5 @@ class GatherCommitAndBranchData:
                 branch = line[2:]
                 break
         results_holder_dct['branch'] = branch
-        return
 
 ## end class GatherCommitAndBranchData

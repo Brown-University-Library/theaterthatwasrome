@@ -146,7 +146,7 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 
 - Use Django's test framework.
 - The canonical unit suite is `uv run ./run_tests.py`; this is also the command run by CI.
-- Standalone Pyright checks need Django 5.2 type definitions (`django-stubs~=5.2.0`) in addition to the project's interpreter. Supply these in a temporary `uv run --no-project --with` environment when needed; missing or outdated definitions can incorrectly flag model `.objects` lookups and string `HttpResponse` bodies. Do not suppress diagnostics to work around missing definitions.
+- Check changed Python files with VS Code's Pylance, using the project's interpreter and type-checking settings. If Pylance is unavailable, use Pyright with matching settings and Django type definitions. Different type-definition versions can produce different results; a standalone check with newer definitions does not establish that the editor is clear. Do not suppress diagnostics to work around missing definitions.
 - Unit tests belong in `unit_tests/`. HTTP behavior is normally isolated with `responses`, using data from `unit_tests/responses_data.py`.
 - Live-service tests belong in `integration_tests/` and run through `uv run ./run_integration_tests.py` only when live integration coverage is intentional.
 - New behavior should usually have a focused test covering:

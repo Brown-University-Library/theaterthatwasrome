@@ -1,11 +1,15 @@
+import datetime
 import json
 from unittest.mock import patch
 
+import requests
 import responses
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from rome_app import models, views
+from rome_app import models
+from rome_app.lib import annotation_helpers, version_helper
+
 from . import responses_data
 
 
@@ -87,7 +91,7 @@ class TestAnnotationOrigin(TestCase):
             ),
             content_type='text/xml',
         )
-        annotation = views.get_annotation_detail({'pid': 'testsuite:234', 'xml_uri': url})
+        annotation = annotation_helpers.get_annotation_detail({'pid': 'testsuite:234', 'xml_uri': url})
         self.assertEqual(annotation['origin'], '1638')
         self.assertEqual(annotation['has_elements']['origin'], 1)
         self.assertEqual(annotation['impression'], '1695')
@@ -107,12 +111,89 @@ class TestAnnotationOrigin(TestCase):
                     body=f'<mods xmlns="http://www.loc.gov/mods/v3">{origin_xml}</mods>',
                     content_type='text/xml',
                 )
-                annotation = views.get_annotation_detail({'pid': 'testsuite:234', 'xml_uri': url})
+                annotation = annotation_helpers.get_annotation_detail({'pid': 'testsuite:234', 'xml_uri': url})
                 self.assertEqual(annotation['has_elements']['origin'], 0)
                 self.assertNotIn('origin', annotation)
 
 
 class TestViewResponses(TestCase):
+    def test_people_roles_and_filter(self) -> None:
+        """
+        Checks that roles display as words and filters match whole roles, including when other people have no roles.
+        """
+        models.Biography.objects.create(
+            name='Sample Artist', roles=' painter ; engraver; ;', birth_date='1600', death_date='1670'
+        )
+        models.Biography.objects.create(name='Sample Assistant', roles='assistant painter')
+        models.Biography.objects.create(name='Sample Unknown', roles=None)
+        response = self.client.get(reverse('people'))
+        self.assertContains(response, '[painter, engraver]')
+        self.assertContains(response, '(1600 to 1670)')
+        self.assertContains(response, 'Sample Unknown')
+        response = self.client.get(reverse('people'), {'filter': 'painter'})
+        self.assertContains(response, 'Sample Artist')
+        self.assertNotContains(response, 'Sample Assistant')
+        self.assertNotContains(response, 'Sample Unknown')
+        self.assertEqual(response.context['num_results'], 1)
+
+    def test_shop_families(self) -> None:
+        """
+        Checks that shops display their first family and that blank or missing families still render.
+        """
+        models.Shop.objects.create(
+            title='Family Shop',
+            slug='family-shop',
+            family=' Example Family ; Other Family ;',
+            start_date='1600',
+            end_date='1670',
+        )
+        models.Shop.objects.create(title='Unknown Family Shop', slug='unknown-shop', family=None)
+        models.Shop.objects.create(title='Blank Family Shop', slug='blank-shop', family=' ; ')
+        response = self.client.get(reverse('shop_list'))
+        self.assertContains(response, 'Example Family')
+        self.assertNotContains(response, 'Other Family')
+        self.assertContains(response, 'Unknown Family Shop')
+        self.assertContains(response, 'Blank Family Shop')
+        self.assertContains(response, '<i>1600</i> — <i>1670</i>', html=True)
+        self.assertEqual(response.context['num_results'], 3)
+
+    @responses.activate
+    def test_metadata_request_failures(self) -> None:
+        """
+        Checks that BDR HTTP errors and timeouts keep the existing page and print error responses.
+        """
+        page_url = reverse('book_page_viewer', kwargs={'book_id': '123', 'page_id': '123456'})
+        print_url = reverse('specific_print', kwargs={'print_id': '123'})
+        for route in [page_url, print_url]:
+            for failure in ['Service unavailable', requests.Timeout('BDR timed out')]:
+                with self.subTest(route=route, failure=type(failure).__name__):
+                    responses.reset()
+                    responses.add(
+                        responses.GET,
+                        'https://localhost/api/items/testsuite:123456/',
+                        body=responses_data.ITEM_API_DATA,
+                        content_type='application/json',
+                    )
+                    responses.add(
+                        responses.GET,
+                        'https://localhost/api/items/testsuite:123/',
+                        body=failure,
+                        status=503,
+                    )
+                    response = self.client.get(route)
+                    self.assertEqual(response.status_code, 500)
+                    self.assertIn(b'retrieving content', response.content)
+
+    def test_version_timing_with_timezone(self) -> None:
+        """
+        Checks that version timing accepts a timestamp with a timezone.
+        """
+        request = RequestFactory().get('/version/')
+        started = datetime.datetime.now(tz=datetime.timezone.utc)
+        context = version_helper.make_context(request, started, 'example-commit')
+        self.assertEqual(context['response']['version'], 'example-commit')
+        self.assertRegex(context['response']['timetaken'], r'^\d+:\d{2}:\d{2}')
+
     def test_role_checker(self) -> None:
         """
         Checks that the role checker returns its result without an undefined logger error.
