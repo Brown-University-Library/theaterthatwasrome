@@ -52,7 +52,7 @@ from rome_app.lib.version_helper import GatherCommitAndBranchData
 def temp_roles_checker(request):
     """ Checks biography-roles against Roles table.
         Called by `__main__`. """
-    log.debug( '\n\nstarting temp_roles_checker()' )
+    logger.debug( '\n\nstarting temp_roles_checker()' )
     from rome_app.lib import roles_checker
     problems = roles_checker.run_code()
     data = {
@@ -289,7 +289,10 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
     context['breadcrumbs'][-2]['name'] = breadcrumb_detail(context, view="print")
 
     # annotations/metadata
-    annotations = this_page.relations['hasAnnotation']
+    relations = this_page.data.get('relations')
+    annotations = relations.get('hasAnnotation') if isinstance(relations, dict) else None
+    if not isinstance(annotations, list):
+        annotations = []
     context['has_annotations'] = len(annotations)
     context['annotation_uris'] = []
     context['annotations'] = []
@@ -311,7 +314,11 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
     context['next_pid'] = next_id
     context['essays'] = this_page.essays()
 
-    context['breadcrumbs'][-1]['name'] = "Image " + this_page.rel_has_pagination_ssim[0]
+    pagination = this_page.data.get('rel_has_pagination_ssim')
+    page_label = page_id
+    if isinstance(pagination, list) and pagination and isinstance(pagination[0], str) and pagination[0]:
+        page_label = pagination[0]
+    context['breadcrumbs'][-1]['name'] = f'Image {page_label}'
     return render(request, 'rome_templates/page_detail.html', context)
 
 
@@ -364,8 +371,9 @@ def get_annotation_detail(annotation):
                         curr_annot['has_elements']['impression']=1
                 except Exception:
                     pass
-            curr_annot['origin']=origin[0].date
-            curr_annot['has_elements']['origin']=1
+            if len(origin) and origin[0].text:
+                curr_annot['origin'] = origin[0].text
+                curr_annot['has_elements']['origin'] = 1
         except Exception:
             pass
     for impression in root.iter('{http://www.loc.gov/mods/v3}dateOther'):
@@ -699,16 +707,16 @@ def essay_list(request):
     context=std_context(request.path, style="rome/css/links.css")
     context['page_documentation']='Listed below are essays on topics that relate to the Theater that was Rome collection of books and engravings. The majority of the essays were written by students in Brown University classes that used this material, and edited by Prof. Evelyn Lincoln.'
     essay_objs = Essay.objects.all()
-    context['essay_objs'] = essay_objs
     context['num_results']=len(essay_objs)
     #temporary, until i figure out how to define an ESSAYS_PER_PAGE variable
     context['results_per_page'] = len(essay_objs)
     page = request.GET.get('page', 1)
     context['curr_page'] = page
    
+    essay_entries: list[dict[str, object]] = []
     for essay in essay_objs:
-        essay.thumbs = []
-        essay.related_list=[]
+        thumbs: list[list[str]] = []
+        related_list = []
         for work in essay.related_works():
             current_work={}
             current_work['title']=work['primary_title']
@@ -721,9 +729,18 @@ def essay_list(request):
             current_work['pid']=work['pid'].split(":")[-1]
             if 'rel_is_part_of_ssim' in work:
                 current_work['ppid'] = work['rel_is_part_of_ssim'][0].split(":")[-1]
-                essay.thumbs.append([current_work['ppid'], current_work['pid']])
-            essay.related_list.append(current_work)
-            essay.thumbs = essay.thumbs[:5]
+                thumbs.append([current_work['ppid'], current_work['pid']])
+            related_list.append(current_work)
+        essay_entries.append({
+            'author': essay.author,
+            'title': essay.title,
+            'slug': essay.slug,
+            'preview': essay.preview(),
+            'is_note': essay.is_note,
+            'thumbs': thumbs[:5],
+            'related_list': related_list,
+        })
+    context['essay_objs'] = essay_entries
     return render(request, 'rome_templates/essay_list.html', context)
 
 
@@ -808,7 +825,6 @@ def search_page(request):
 
 @login_required(login_url=reverse_lazy('rome_login'))
 def new_annotation(request, book_id, page_id):
-    logger
     page_pid = '%s:%s' % (PID_PREFIX, page_id)
     from .forms import AnnotationForm, PersonForm, InscriptionForm
     PersonFormSet = formset_factory(PersonForm)
