@@ -107,7 +107,10 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 
 ### View-layer responsibilities
 
-- `rome_app/views.py` should contain only view functions that directly handle URL endpoints and small helpers that are tightly coupled to response construction.
+- Always use function-based views for Django projects. Do not use class-based views.
+- Every application endpoint in `rome_app/urls_app.py` must refer directly to a manager function in `rome_app/views.py` as `views.function_name`. Do not split these endpoint functions into separate view modules. Django's admin URL include remains managed by Django.
+- `rome_app/views.py` should contain only view functions that directly handle URL endpoints.
+- Existing helpers in `views.py`, such as `std_context()`, are legacy code. Put new helpers under `rome_app/lib/`; move existing helpers when the task requires changing them, without broad unrelated cleanup.
 - Every endpoint view in `rome_app/views.py` should correspond to an entry in `rome_app/urls_app.py`; the Turnstile verification endpoint is the exception and is wired in `config/urls.py`.
 - Views should coordinate request and response work:
   - Parse query parameters, POST bodies, and files.
@@ -125,7 +128,7 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 ### Imports and dependencies
 
 - `views.py` should primarily import Django response/request primitives and the minimal set of functions and classes needed by each endpoint.
-- Avoid creating another group of general-purpose view helpers inside `views.py`; place those helpers in `rome_app/lib/`.
+- Put new view helpers in `rome_app/lib/`, not in `views.py`.
 - Avoid import-time network or database work. `rome_app/app_settings.py` already reads required environment values at import time, so tests and scripts must establish those values before Django setup.
 
 
@@ -200,6 +203,7 @@ This Django application serves The Theater That Was Rome, a scholarly site for e
 - `config/urls.py` exposes the Turnstile verification endpoint and then includes `rome_app/urls_app.py` at the root.
 - `rome_app/urls_app.py` groups routes for static pages, books/pages, prints, essays, people, shops, documents, authenticated record creation, search, version information, and a temporary role checker.
 - `std_context()` in `rome_app/views.py` supplies common styles, image paths, title data, and breadcrumbs. Most rendered views depend on it.
+- The `rome_login` route calls `views.login_page()`, which uses Django's `AuthenticationForm` and renders `rome_templates/login.html` with `home.css` and `login.css`. Successful login stays on this route even when a `next` destination was supplied. The page greets an authenticated user by first name, falling back to username. Login behavior is covered in `unit_tests/test_login.py`.
 - Book and print detail pages share `rome_templates/page_detail.html`, distinguished by `book_mode` and `print_mode` context flags.
 - Static production hosting uses a `/projects/rome/` prefix outside the Django route definitions. Do not add that prefix to `rome_app/urls_app.py`; settings and the hosting layer handle it.
 

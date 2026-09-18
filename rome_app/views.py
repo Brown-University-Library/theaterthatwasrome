@@ -10,7 +10,7 @@ from operator import itemgetter, methodcaller
 import trio
 
 from django.conf import settings
-from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError, HttpResponseRedirect
+from django.http import HttpRequest, HttpResponse, HttpResponseNotFound, HttpResponseServerError, HttpResponseRedirect
 from django.forms.formsets import formset_factory
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import mail_admins
@@ -19,7 +19,13 @@ from django.urls import reverse, reverse_lazy
 from django.shortcuts import render
 from django.template.response import SimpleTemplateResponse
 from django.utils.html import escape, escapejs
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login as auth_login
+from django.contrib.auth.decorators import login_not_required, login_required
+from django.contrib.auth.forms import AuthenticationForm
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.debug import sensitive_post_parameters
+from django.views.decorators.http import require_http_methods
 
 from .models import (
         InvalidNameError,
@@ -89,6 +95,32 @@ def std_context(path, style="rome/css/content.css",title="The Theater that was R
     context['page_documentation']=""
     context['breadcrumbs']=breadcrumbs
     return context
+
+
+@login_not_required
+@sensitive_post_parameters()
+@never_cache
+@csrf_protect
+@require_http_methods(['GET', 'HEAD', 'POST'])
+def login_page(request: HttpRequest) -> HttpResponse:
+    """
+    Displays the website login form and a welcome message after login.
+    Called by: django.core.handlers.base.BaseHandler._get_response()
+    """
+    form = AuthenticationForm(request, data=request.POST if request.method == 'POST' else None)
+    user = None
+    if request.method == 'POST' and form.is_valid():
+        user = form.get_user()
+
+    response: HttpResponse
+    if user is not None:
+        auth_login(request, user)
+        response = HttpResponseRedirect(reverse('rome_login'))
+    else:
+        context: dict[str, object] = std_context(request.path, style='rome/css/home.css')
+        context['form'] = form
+        response = render(request, 'rome_templates/login.html', context)
+    return response
 
 
 def index(request):

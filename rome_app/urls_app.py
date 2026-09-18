@@ -1,6 +1,5 @@
 from django.urls import include, re_path
 from django.contrib import admin
-from django.contrib.auth.views import LoginView
 from rome_app import views
 
 
@@ -10,7 +9,7 @@ BDR_ID_RE = '[a-z0-9]+'
 urlpatterns = [
     #admin/user
     re_path(r'^admin/', admin.site.urls),
-    re_path(r'^login/$', LoginView.as_view(template_name='rome_templates/login.html'), name='rome_login'),
+    re_path(r'^login/$', views.login_page, name='rome_login'),
 
     #index and static
     re_path(r'^$', views.index, name='index'),
@@ -50,4 +49,3 @@ urlpatterns = [
     ## temp data-correction
     re_path( r'^temp_roles_checker/$', views.temp_roles_checker, name='temp_roles_checker_url' ),
 ]
-
