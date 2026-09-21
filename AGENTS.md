@@ -140,6 +140,8 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 - Use Django's test framework.
 - The canonical unit suite is `uv run ./run_tests.py`; this is also the command run by CI.
 - Check changed Python files with VS Code's Pylance, using the project's interpreter and type-checking settings. If Pylance is unavailable, use Pyright with matching settings and Django type definitions. Different type-definition versions can produce different results; a standalone check with newer definitions does not establish that the editor is clear. Do not suppress diagnostics to work around missing definitions.
+- Pylance must load `typings/bdrxml/` for the dynamically generated XML fields. When VS Code opens the enclosing directory, set `python.analysis.stubPath` to `${workspaceFolder}/ttwr/typings` in that workspace's `.vscode/settings.json`; when it opens this repository, the default `typings` path applies.
+- Run `ruff check` on changed Python files using this repository's `ruff.toml`, and check VS Code's Problems panel when available. Pylance/Pyright does not check Ruff warnings; a temporary checker configuration does not configure the editor.
 - Unit tests belong in `unit_tests/`. BDR HTTP calls are isolated with `BdrMock` in `unit_tests/http_mock.py`, using data from `unit_tests/responses_data.py` or small synthetic examples. The mock rejects unexpected network requests.
 - Live-service tests belong in `integration_tests/` and run through `uv run ./run_integration_tests.py` only when live integration coverage is intentional.
 - New behavior should usually have a focused test covering the expected path and at least one failure or edge case.

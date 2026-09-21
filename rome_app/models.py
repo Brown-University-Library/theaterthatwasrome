@@ -2,6 +2,7 @@ import json
 import pprint
 import re
 from collections import OrderedDict
+from typing import ClassVar
 
 from bdrxml import mods
 from django.conf import settings
@@ -57,7 +58,7 @@ def validate_roles(value):
     if len(problem_roles) == 1:
         raise ValidationError(f'The following role is not in the `Roles` database-table: {problem_roles[0]}')
     elif len(problem_roles) > 1:
-        raise ValidationError('The following roles are not in the `Roles` database-table: %s' % '; '.join(problem_roles))
+        raise ValidationError(f'The following roles are not in the `Roles` database-table: {"; ".join(problem_roles)}')
     else:
         return value
 
@@ -103,7 +104,7 @@ class Biography(models.Model):
 
     class Meta:
         verbose_name_plural = 'biographies'
-        ordering = ['name']
+        ordering: ClassVar[list[str]] = ['name']
 
     def books(self):
         query_string = f'genre_aat:books+AND+name:"{self.name}"'
@@ -113,11 +114,11 @@ class Biography(models.Model):
 
     def prints(self):
         return Book.search(
-            query='(genre_aat:"etchings (prints)"+OR+genre_aat:"engravings (prints)")+AND+name:"%s"' % self.name
+            query=f'(genre_aat:"etchings (prints)"+OR+genre_aat:"engravings (prints)")+AND+name:"{self.name}"'
         )
 
     def format_trp_id(self, trp_id):
-        return '%04d' % int(trp_id)
+        return f'{int(trp_id):04d}'
 
     def related_essays(self):
         return self.essay_set.all()
@@ -132,7 +133,7 @@ class Biography(models.Model):
             last_bio = ordered_bios[index + 1]
         last_trp_id = int(last_bio.trp_id)
         new_trp_id = last_trp_id + 1
-        return '%04d' % new_trp_id
+        return f'{new_trp_id:04d}'
 
     def save(self, *args, **kwargs):
         if not self.trp_id:
@@ -148,7 +149,7 @@ class Biography(models.Model):
             super().save(*args, **kwargs)
 
     def __str__(self):
-        return '%s (%s)' % (self.name, self.trp_id)
+        return f'{self.name} ({self.trp_id})'
 
 
 class Document(models.Model):
@@ -184,12 +185,11 @@ class Essay(models.Model):
         return self.text[:254]
 
     def related_works(self):
-        num_prints_estimate = 6000
         if not self.pids:
             return {}
         else:
             query = get_related_works_query(self.pids)
-            query_uri = 'https://%s/api/search/?q=%s' % (app_settings.BDR_SERVER, query)
+            query_uri = f'https://{app_settings.BDR_SERVER}/api/search/?q={query}'
             r = bdr_client.request('GET', query_uri)
             response_data = r.json()  # automatically parses the content into json
             annotations = response_data['response']['docs']
@@ -227,12 +227,11 @@ class Shop(models.Model):
         return self.essay_set.all()
 
     def related_works(self):
-        num_prints_estimate = 6000
         if not self.pids:
             return {}
         else:
             query = get_related_works_query(self.pids)
-            query_uri = 'https://%s/api/search/?q=%s' % (app_settings.BDR_SERVER, query)
+            query_uri = f'https://{app_settings.BDR_SERVER}/api/search/?q={query}'
             r = bdr_client.request('GET', query_uri)
             response_data = r.json()  # automatically parses the content into json
             annotations = response_data['response']['docs']
@@ -263,20 +262,21 @@ class Role(models.Model):
 
 def get_related_works_query(pids):
     if pids is not None:
-        pidlist = ['pid:"%s:%s"' % (app_settings.PID_PREFIX, p) for p in pids.split(',')]
+        pidlist = [f'pid:"{app_settings.PID_PREFIX}:{p}"' for p in pids.split(',')]
         query = (
-            'rel_is_member_of_collection_ssim:"%s"+AND+display:BDR_PUBLIC+AND+(%s)&fl=primary_title,rel_has_pagination_ssim,rel_is_part_of_ssim,creator,pid,genre'
-            % (settings.TTWR_COLLECTION_PID, '+OR+'.join(pidlist))
+            f'rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"'
+            f'+AND+display:BDR_PUBLIC+AND+({"+OR+".join(pidlist)})'
+            '&fl=primary_title,rel_has_pagination_ssim,rel_is_part_of_ssim,creator,pid,genre'
         )
         return query
 
 
 def zoom_viewer_url(pid):
-    return 'https://%s/viewers/image/zoom/%s?first_child_only=1' % (app_settings.BDR_SERVER, pid)
+    return f'https://{app_settings.BDR_SERVER}/viewers/image/zoom/{pid}?first_child_only=1'
 
 
 def annotation_xml_url(pid):
-    return 'https://%s/storage/%s/MODS/' % (app_settings.BDR_SERVER, pid)
+    return f'https://{app_settings.BDR_SERVER}/storage/{pid}/MODS/'
 
 
 class BDRObject:
@@ -318,7 +318,7 @@ class BDRObject:
 
     @classmethod
     def get(cls, pid):
-        json_uri = 'https://%s/api/items/%s/?q=*&fl=*' % (app_settings.BDR_SERVER, pid)
+        json_uri = f'https://{app_settings.BDR_SERVER}/api/items/{pid}/?q=*&fl=*'
         resp = bdr_client.request('GET', json_uri, allow_not_found=True)
         if resp.status_code == 404:
             return cls()
@@ -338,10 +338,10 @@ class BDRObject:
     def _get_full_title(self):
         data = self.data
         if 'nonsort' not in data:
-            return '%s' % data['primary_title']
+            return str(data['primary_title'])
         if data['nonsort'].endswith("'"):
-            return '%s%s' % (data['nonsort'], data['primary_title'])
-        return '%s %s' % (data['nonsort'], data['primary_title'])
+            return f'{data["nonsort"]}{data["primary_title"]}'
+        return f'{data["nonsort"]} {data["primary_title"]}'
 
     @property
     def studio_uri(self):
@@ -379,13 +379,13 @@ class BDRObject:
 
     @property
     def thumbnail_src(self):
-        return 'https://%s/viewers/image/thumbnail/%s/' % (app_settings.BDR_SERVER, self.pid)
+        return f'https://{app_settings.BDR_SERVER}/viewers/image/thumbnail/{self.pid}/'
 
 
 class Book(BDRObject):
     OBJECT_TYPE = 'implicit-set'
     CUTOFF = 80
-    SORT_OPTIONS = OrderedDict(
+    SORT_OPTIONS: ClassVar[OrderedDict[str, str]] = OrderedDict(
         [
             ('authors', 'authors'),
             ('title', 'title_sort'),
@@ -407,10 +407,10 @@ class Book(BDRObject):
         return bool(len(self.title()) > Book.CUTOFF)
 
     def port_url(self):
-        return 'https://%s/viewers/readers/portfolio/%s/' % (app_settings.BDR_SERVER, self.pid)
+        return f'https://{app_settings.BDR_SERVER}/viewers/readers/portfolio/{self.pid}/'
 
     def book_url(self):
-        return 'https://%s/viewers/readers/set/%s/' % (app_settings.BDR_SERVER, self.pid)
+        return f'https://{app_settings.BDR_SERVER}/viewers/readers/set/{self.pid}/'
 
     def pages(self):
         return [Page(data=page_data, parent=self) for page_data in self.relations['hasPart']]
@@ -420,7 +420,7 @@ class Book(BDRObject):
 
 
 class Page(BDRObject):
-    SORT_OPTIONS = OrderedDict(
+    SORT_OPTIONS: ClassVar[OrderedDict[str, str]] = OrderedDict(
         [
             ('authors', 'authors'),
             ('title', 'title'),
@@ -454,10 +454,11 @@ class Print(Page):
 
         num_prints_estimate = 1000
         query = (
-            'rel_is_member_of_collection_ssim:"%s"+AND+(genre_aat:"etchings (prints)"+OR+genre_aat:"engravings (prints)")%s'
-            % (settings.TTWR_COLLECTION_PID, collection_query)
+            f'rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"'
+            '+AND+(genre_aat:"etchings (prints)"+OR+genre_aat:"engravings (prints)")'
+            f'{collection_query}'
         )
-        url = 'https://%s/api/search/?q=%s&rows=%s' % (app_settings.BDR_SERVER, query, num_prints_estimate)
+        url = f'https://{app_settings.BDR_SERVER}/api/search/?q={query}&rows={num_prints_estimate}'
         r = bdr_client.request('GET', url)
         prints_json = json.loads(r.text)
         prints = []
@@ -503,7 +504,7 @@ class Print(Page):
         except KeyError:
             try:
                 author_list = solr_doc['contributor']
-            except:
+            except KeyError:
                 author_list = ['Unknown']
         authors = ''
         for i in range(len(author_list)):
@@ -513,7 +514,7 @@ class Print(Page):
                 authors += author_list[i] + '; '
         current_print['authors'] = authors
 
-        current_print['studio_uri'] = 'https://%s/studio/item/%s/' % (app_settings.BDR_SERVER, pid)
+        current_print['studio_uri'] = f'https://{app_settings.BDR_SERVER}/studio/item/{pid}/'
         current_print['thumbnail_url'] = reverse('specific_print', args=[current_print['id']])
         current_print['det_img_viewer'] = zoom_viewer_url(pid)
         return current_print
@@ -532,8 +533,10 @@ def _get_annotations_for_person(bio_name):
     logger.debug(f'bio_name, ``{bio_name}``')
     num_prints_estimate = 6000
     query_uri = (
-        'https://%s/api/search/?q=rel_is_member_of_collection_ssim:"%s"+AND+object_type:"annotation"+AND+contributor:"%s"+AND+display:BDR_PUBLIC&rows=%s&fl=rel_is_annotation_of_ssim,primary_title,pid,nonsort'
-        % (app_settings.BDR_SERVER, settings.TTWR_COLLECTION_PID, bio_name, num_prints_estimate)
+        f'https://{app_settings.BDR_SERVER}/api/search/?q='
+        f'rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"'
+        f'+AND+object_type:"annotation"+AND+contributor:"{bio_name}"'
+        f'+AND+display:BDR_PUBLIC&rows={num_prints_estimate}&fl=rel_is_annotation_of_ssim,primary_title,pid,nonsort'
     )
     logger.debug(f'query_uri to get annotations-for-person, ``{query_uri}``')
     annotations = bdr_client.request('GET', query_uri).json()['response']['docs']
@@ -544,17 +547,13 @@ def _get_annotations_for_person(bio_name):
 def _get_pages_from_annotations(annotations):
     # create a list of pages (or prints) the annotations are attached to
     logger.debug('about to build pages from annotations')
-    pages = dict([(page['rel_is_annotation_of_ssim'][0].split(':')[-1], page) for page in annotations])
+    pages = {page['rel_is_annotation_of_ssim'][0].split(':')[-1]: page for page in annotations}
     logger.debug(f'pages initially, ``{pages}``')
-    for page_id in pages:
-        page = pages[page_id]
+    for page_id, page in pages.items():
         page['title'] = get_full_title_static(page)
         page['page_id'] = page_id
         page['id'] = page_id.split(':')[-1]
-        page['thumb'] = 'https://%s/viewers/image/thumbnail/%s/' % (
-            app_settings.BDR_SERVER,
-            page['rel_is_annotation_of_ssim'][0],
-        )
+        page['thumb'] = f'https://{app_settings.BDR_SERVER}/viewers/image/thumbnail/{page["rel_is_annotation_of_ssim"][0]}/'
     logger.debug(f'pages, ``{pages}``')
     return pages
 
@@ -589,8 +588,8 @@ def annotations_by_books_and_prints(bio_name, group_amount=50):
         group_of_pids = pids_of_pages_to_look_up[i : i + group_amount]
         pids_query = '(pid:' + ('+OR+pid:'.join(group_of_pids)) + ')'
         book_query = (
-            'https://%s/api/search/?q=%s+AND+display:BDR_PUBLIC&fl=pid,primary_title,nonsort,object_type,rel_is_part_of_ssim,rel_has_pagination_ssim&rows=%s'
-            % (app_settings.BDR_SERVER, pids_query, group_amount)
+            f'https://{app_settings.BDR_SERVER}/api/search/?q={pids_query}+AND+display:BDR_PUBLIC'
+            f'&fl=pid,primary_title,nonsort,object_type,rel_is_part_of_ssim,rel_has_pagination_ssim&rows={group_amount}'
         )
         logger.debug(f'book_query url, ``{book_query}``')
         data = bdr_client.request('GET', book_query).json()
@@ -620,7 +619,7 @@ def annotations_by_books_and_prints(bio_name, group_amount=50):
                     # add new book to our list of books
                     books[book_id] = {}
                     books[book_id]['title'] = get_full_title_static(page)
-                    books[book_id]['pages'] = dict()
+                    books[book_id]['pages'] = {}
                 books[book_id]['pages'][n] = pages[page['pid'].split(':')[-1]]
             except KeyError:
                 # page has no rel_is_part_of_ssim, so it's a print
@@ -656,9 +655,9 @@ class Annotation:
     @classmethod
     def trp_id_from_name_node(cls, name_node):
         try:
-            trp_id = name_node.get('{%s}href' % app_settings.XLINK_NAMESPACE)
-            trp_id = '%04d' % int(trp_id)
-        except Exception:
+            trp_id = name_node.get(f'{{{app_settings.XLINK_NAMESPACE}}}href')
+            trp_id = f'{int(trp_id):04d}'
+        except (TypeError, ValueError):
             trp_id = ''
         return trp_id
 
@@ -668,15 +667,15 @@ class Annotation:
         annotator=None,
         pid=None,
         form_data=None,
-        person_formset_data=[],
-        inscription_formset_data=[],
+        person_formset_data=None,
+        inscription_formset_data=None,
         mods_obj=None,
     ):
         self._image_pid = image_pid  # pid of the object that we're adding the annotation for
         self._annotator = annotator
         self._form_data: dict = form_data or {}
-        self._person_formset_data = [p for p in person_formset_data if p and p['person']]
-        self._inscription_formset_data = [i for i in inscription_formset_data if i and i['text']]
+        self._person_formset_data = [p for p in (person_formset_data or []) if p and p['person']]
+        self._inscription_formset_data = [i for i in (inscription_formset_data or []) if i and i['text']]
         self._mods_obj: mods.Mods | None = mods_obj
         self._pid = pid
 
@@ -695,7 +694,7 @@ class Annotation:
         if not self._form_data:
             form_data = {}
             if not self._mods_obj:
-                raise Exception('no form data or mods obj')
+                raise ValueError('no form data or mods obj')
             title1 = self._mods_obj.title_info_list[0]
             form_data['title'] = title1.title
             title1_lang = title1.node.get('lang')
@@ -713,16 +712,15 @@ class Annotation:
                     form_data['genre'] = genre.id
             if self._mods_obj.abstract:
                 form_data['abstract'] = self._mods_obj.abstract.text
-            if self._mods_obj.origin_info:
-                if self._mods_obj.origin_info.other:
-                    form_data['impression_date'] = self._mods_obj.origin_info.other[0].date
+            if self._mods_obj.origin_info and self._mods_obj.origin_info.other:
+                form_data['impression_date'] = self._mods_obj.origin_info.other[0].date
             self._form_data = form_data
         return self._form_data
 
     def get_person_formset_data(self):
         if not self._person_formset_data:
             if not self._mods_obj:
-                raise Exception('no person formset data or mods obj')
+                raise ValueError('no person formset data or mods obj')
             self._person_formset_data = []
             for name in self._mods_obj.names:
                 p = {}
@@ -748,7 +746,7 @@ class Annotation:
     def get_inscription_formset_data(self):
         if not self._inscription_formset_data:
             if not self._mods_obj:
-                raise Exception('no inscription formset data or mods obj')
+                raise ValueError('no inscription formset data or mods obj')
             self._inscription_formset_data = [
                 {'text': note.text, 'location': note.label} for note in self._mods_obj.notes if note.type == 'inscription'
             ]
@@ -761,7 +759,7 @@ class Annotation:
                 return self._mods_obj
         else:  # no self._mods_obj
             if update:
-                raise Exception("no mods obj - can't update")
+                raise ValueError("no mods obj - can't update")
             self._mods_obj = mods.make_mods()
         # at this point, we want to put the form data into the mods obj (could be update or new)
         self._mods_obj.title_info_list = []  # clear out any old titles
@@ -808,13 +806,13 @@ class Annotation:
         self._mods_obj.names = []
         for p in self._person_formset_data:
             if not p['person'].trp_id:
-                raise Exception(f'error getting mods object - no trp_id: {p["person"]}')
+                raise ValueError(f'error getting mods object - no trp_id: {p["person"]}')
             name = mods.Name()
             np = mods.NamePart(text=p['person'].name)
             name.name_parts.append(np)
             role = mods.Role(text=p['role'].text)
             name.roles.append(role)
-            href = '{%s}href' % app_settings.XLINK_NAMESPACE
+            href = f'{{{app_settings.XLINK_NAMESPACE}}}href'
             name.node.set(href, p['person'].trp_id)
             self._mods_obj.names.append(name)
         # clear out old notes data, preserving any annotor info
@@ -850,7 +848,7 @@ class Annotation:
         if self._pid:
             params['pid'] = self._pid
         else:
-            raise Exception('no pid for annotation update')
+            raise ValueError('no pid for annotation update')
         return params
 
     def save_to_bdr(self):
@@ -869,8 +867,8 @@ def get_full_title_static(data):
         return 'No Title'
     if 'nonsort' in data:
         if data['nonsort'].endswith("'"):
-            return '%s%s' % (data['nonsort'], data['primary_title'])
+            return f'{data["nonsort"]}{data["primary_title"]}'
         else:
-            return '%s %s' % (data['nonsort'], data['primary_title'])
+            return f'{data["nonsort"]} {data["primary_title"]}'
     else:
-        return '%s' % data['primary_title']
+        return str(data['primary_title'])
