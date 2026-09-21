@@ -97,6 +97,20 @@ MARKDOWN_DEUX_STYLES = {
 }
 
 LOG_DIR = get_env_setting('LOG_DIR')
+
+## logging order of operations --------------------------------------
+## django.request logger
+##   │
+##   ├─ Below ERROR? Stop.
+##   │
+##   └─ mail_admins handler
+##        │
+##        ├─ Below ERROR? Stop.
+##        ├─ require_debug_false: DEBUG=True? Stop.
+##        ├─ skip_handled_bdr_failure: Handled BDR outage? Stop.
+##        │
+##        └─ Send administrator email.
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
