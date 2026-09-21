@@ -5,7 +5,6 @@ import pprint
 import re
 from operator import itemgetter, methodcaller
 
-import requests
 import trio
 from django.conf import settings
 from django.contrib.auth import login as auth_login
@@ -13,7 +12,6 @@ from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ObjectDoesNotExist
-from django.core.mail import mail_admins
 from django.core.paginator import Paginator
 from django.forms.formsets import formset_factory
 from django.http import HttpRequest, HttpResponse, HttpResponseNotFound, HttpResponseRedirect, HttpResponseServerError
@@ -26,7 +24,9 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST, require_http_methods
 
-from rome_app.lib import annotation_helpers, login_helpers, version_helper
+from rome_app.lib import annotation_forms, annotation_helpers, bdr_display, login_helpers, version_helper
+from rome_app.lib.bdr_client import BdrUnavailable
+from rome_app.lib.bdr_failure import render_content
 from rome_app.lib.version_helper import GatherCommitAndBranchData
 
 from .app_settings import BDR_SERVER, BOOKS_PER_PAGE, PID_PREFIX
@@ -36,13 +36,11 @@ from .models import (
     Book,
     Document,
     Essay,
-    InvalidNameError,
     Page,
     Print,
     Shop,
     Static,
     annotation_xml_url,
-    annotations_by_books_and_prints,
     get_full_title_static,
     zoom_viewer_url,
 )
@@ -172,6 +170,8 @@ def book_list(request):
         buonanno = "+NOT+(note:buonanno)"
     try:
         book_list = Book.search(query="genre_aat:book*"+buonanno)
+    except BdrUnavailable:
+        raise
     except Exception:
         logger.exception('book_list view error getting book_list data')
         return HttpResponse('error loading list of books', status=500)
@@ -261,10 +261,7 @@ def page_detail(request, page_id: str, book_id=None):  # book_id will be type st
     context['book_id'] = book_id
 
     book_json_uri = f'https://{BDR_SERVER}/api/items/{book_pid}/'
-    try:
-        r = annotation_helpers.fetch_url_content(book_json_uri)
-    except requests.RequestException:
-        return HttpResponseServerError('Error retrieving content.')
+    r = annotation_helpers.fetch_url_content(book_json_uri)
     book_json = json.loads(r.text)
     context['short_title'] = book_json['brief']['title']
     context['title'] = get_full_title_static(book_json)
@@ -395,10 +392,7 @@ def print_detail(request, print_id):
     context['studio_url'] = f'https://{BDR_SERVER}/studio/item/{print_pid}/'
 
     json_uri = f'https://{BDR_SERVER}/api/items/{print_pid}/'
-    try:
-        r = annotation_helpers.fetch_url_content(json_uri)
-    except requests.RequestException:
-        return HttpResponseServerError('error retrieving content')
+    r = annotation_helpers.fetch_url_content(json_uri)
     print_json = json.loads(r.text)
     context['short_title'] = print_json['brief']['title']
     context['title'] = get_full_title_static(print_json)
@@ -459,32 +453,12 @@ def biography_detail(request, trp_id):
     logger.debug( 'added bio to context' )
     context['trp_id'] = trp_id
     logger.debug( 'added trp_id to context' )
-    # try:
-    #     logger.debug( 'about to try bio.books() call' )
-    #     context['books'] = bio.books()
-    # except Exception as e:
-    #     logger.exception( f'exception getting bio.books(), ``{e}``' )
-    logger.debug( 'about to try bio.books() call' )
-    context['books'] = bio.books()  # weird: raises error on bdr-api lookup 404
-    logger.debug( f'context after bio.books() lookup, ``{pprint.pformat(context)}``' )
     context['essays'] = bio.related_essays()
-    logger.debug( f'context so far, ``{pprint.pformat(context)}``' )
-    prints_search = bio.prints()
-    logger.debug( f'prints_search, ``{prints_search}``' )
+    context.update(bdr_display.biography_related_content(bio))
 
-    # Pages related to the person by annotation
-    logger.debug( 'about to call annotations_by_books_and_prints()' )
-    (pages_books, prints_mentioned) = annotations_by_books_and_prints(bio.name)
-    logger.debug( f'pages_books, ``{pages_books}``; prints_mentioned, ``{prints_mentioned}``' )
-    context['pages_books'] = pages_books
-    # merge the two lists of prints
-    prints_merged = [x for x in prints_mentioned if x not in prints_search]
-    prints_merged[len(prints_merged):] = prints_search
-
-    context['prints'] = prints_merged
     context['breadcrumbs'][-1]['name'] = breadcrumb_detail(context, view="bio")
     logger.debug( f'context, ``{pprint.pformat(context)}``' )
-    return render(request, 'rome_templates/biography_detail.html', context)
+    return render_content(request, 'rome_templates/biography_detail.html', context)
 
 
 def _get_book_pid_from_page_pid( page_pid: str ) -> str:
@@ -595,12 +569,12 @@ def shop_detail(request, shop_slug):
     context['documents'] = shop.documents.all()
     related_list=[]
     thumbnails_list=[]
-    for work in shop.related_works():
+    for work in bdr_display.related_works(shop, context):
         current_work={}
         current_work['sibling'] = False
         current_work['title']=work['primary_title']
         if work.get('creator'):
-            current_work['creator']=work.get('creator')[0]
+            current_work['creator']=work['creator'][0]
         else:
             current_work['creator']="None"
         if 'genre' in work:
@@ -617,7 +591,7 @@ def shop_detail(request, shop_slug):
     context['related_list']=related_list
     context['thumbnails_list']=thumbnails_list
     context['breadcrumbs'][-1]['name'] = shop.title
-    return render(request, 'rome_templates/shop_detail.html', context)
+    return render_content(request, 'rome_templates/shop_detail.html', context)
 
 def essay_list(request):
     logger.debug( '\n\nstarting essay_list()' )
@@ -634,11 +608,11 @@ def essay_list(request):
     for essay in essay_objs:
         thumbs: list[list[str]] = []
         related_list = []
-        for work in essay.related_works():
+        for work in bdr_display.related_works(essay, context):
             current_work={}
             current_work['title']=work['primary_title']
             if work.get('creator'):
-                current_work['creator']=work.get('creator')[0]
+                current_work['creator']=work['creator'][0]
             else:
                 current_work['creator']="None"
             if 'genre' in work:
@@ -658,7 +632,7 @@ def essay_list(request):
             'related_list': related_list,
         })
     context['essay_objs'] = essay_entries
-    return render(request, 'rome_templates/essay_list.html', context)
+    return render_content(request, 'rome_templates/essay_list.html', context)
 
 
 def essay_detail(request, essay_slug):
@@ -673,12 +647,12 @@ def essay_detail(request, essay_slug):
     context['people'] = essay.people.all()
     related_list=[]
     thumbnails_list=[]
-    for work in essay.related_works():
+    for work in bdr_display.related_works(essay, context):
         current_work={}
         current_work['sibling'] = False
         current_work['title']=work['primary_title']
         if work.get('creator'):
-            current_work['creator']=work.get('creator')[0]
+            current_work['creator']=work['creator'][0]
         else:
             current_work['creator']="None"
         if 'genre' in work:
@@ -695,7 +669,7 @@ def essay_detail(request, essay_slug):
     context['related_list']=related_list
     context['thumbnails_list']=thumbnails_list
     context['breadcrumbs'][-1]['name'] = essay.title
-    return render(request, 'rome_templates/essay_detail.html', context)
+    return render_content(request, 'rome_templates/essay_detail.html', context)
 
 def documents(request):
     logger.debug( '\n\nstarting documents()' )
@@ -736,6 +710,9 @@ def search_page(request):
     context["searchquery"] = searchquery
     context["thumbnailquery"] = thumbnailquery
     context["pagequery"] = pagequery
+    context['bdr_browser_timeout_ms'] = max(
+        1, int(1000 * (settings.BDR_CONNECT_TIMEOUT + settings.BDR_READ_TIMEOUT))
+    )
     return render(request, 'rome_templates/search_page.html', context)
 
 
@@ -759,6 +736,8 @@ def new_annotation(request, book_id, page_id):
                 response = annotation.save_to_bdr()
                 logger.info('{} added annotation {} for {}'.format(request.user.username, response['pid'], page_id))
                 return HttpResponseRedirect(reverse('book_page_viewer', kwargs={'book_id': book_id, 'page_id': page_id}))
+            except BdrUnavailable:
+                raise
             except Exception:
                 logger.exception('error saving new annotation')
                 return HttpResponseServerError('Internal server error. Check log.')
@@ -793,6 +772,8 @@ def new_print_annotation(request, print_id):
                 response = annotation.save_to_bdr()
                 logger.info('{} added annotation {} for {}'.format(request.user.username, response['pid'], print_id))
                 return HttpResponseRedirect(reverse('specific_print', kwargs={'print_id': print_id}))
+            except BdrUnavailable:
+                raise
             except Exception:
                 logger.exception('error saving new print annotation')
                 return HttpResponseServerError('Internal server error. Check log.')
@@ -806,64 +787,12 @@ def new_print_annotation(request, print_id):
             {'form': form, 'person_formset': person_formset, 'inscription_formset': inscription_formset, 'image_link': image_link})
 
 
-def get_bound_edit_forms(annotation, AnnotationForm, PersonFormSet, InscriptionFormSet):
-    logger.debug( 'starting non-top-level-view get_bound_edit_forms()' )
-    person_formset = PersonFormSet(initial=annotation.get_person_formset_data(), prefix='people')
-    inscription_formset = InscriptionFormSet(initial=annotation.get_inscription_formset_data(), prefix='inscriptions')
-    form = AnnotationForm(annotation.get_form_data())
-    return {'form': form, 'person_formset': person_formset, 'inscription_formset': inscription_formset}
-
-
-def edit_annotation_base(request, image_pid, anno_pid, redirect_url):
-    logger.debug( '\n\nstarting edit_annotation_base()' )
-    from .forms import AnnotationForm, InscriptionForm, PersonForm
-    PersonFormSet = formset_factory(PersonForm)
-    InscriptionFormSet = formset_factory(InscriptionForm)
-    context_data = {}
-    annotation = Annotation.from_pid(anno_pid)
-    if request.method == 'POST':
-        #this part here is similar to posting a new annotation
-        form = AnnotationForm(request.POST)
-        person_formset = PersonFormSet(request.POST, prefix='people')
-        inscription_formset = InscriptionFormSet(request.POST, prefix='inscriptions')
-        if form.is_valid() and person_formset.is_valid() and inscription_formset.is_valid():
-            #update the annotator to be the person making this edit
-            if request.user.first_name:
-                annotator = f'{request.user.first_name} {request.user.last_name}'
-            else:
-                annotator = f'{request.user.username}'
-            annotation.add_form_data(annotator, form.cleaned_data, person_formset.cleaned_data, inscription_formset.cleaned_data)
-            try:
-                annotation.update_in_bdr()
-                logger.info(f'{request.user.username} edited annotation {anno_pid}')
-                return HttpResponseRedirect(redirect_url)
-            except Exception:
-                logger.exception('error updating annotation')
-                return HttpResponseServerError('Internal server error. Check log.')
-        else:
-            context_data.update({'form': form, 'person_formset': person_formset, 'inscription_formset': inscription_formset})
-    else:
-        try:
-            context_data.update(get_bound_edit_forms(annotation, AnnotationForm, PersonFormSet, InscriptionFormSet))
-        except InvalidNameError as e:
-            mail_admins(subject='TTWR create/edit annotation error',
-                    message=f'exception: {e}', fail_silently=False)
-            return HttpResponse('Existing annotation is invalid. Email has been sent to bdr@brown.edu.')
-        except Exception:
-            logger.exception(f'error loading annotation, ``{anno_pid}``')
-            return HttpResponseServerError('Internal server error.')
-
-    image_link = zoom_viewer_url(image_pid)
-    context_data.update({'image_link': image_link})
-    return render(request, 'rome_templates/new_annotation.html', context_data)
-
-
 @login_required(login_url=reverse_lazy('rome_login'))
 def edit_annotation(request, book_id, page_id, anno_id):
     logger.debug( '\n\nstarting edit_annotation()' )
     anno_pid = f'{PID_PREFIX}:{anno_id}'
     page_pid = f'{PID_PREFIX}:{page_id}'
-    return edit_annotation_base(request, page_pid, anno_pid, reverse('book_page_viewer', kwargs={'book_id': book_id, 'page_id': page_id}))
+    return annotation_forms.edit_annotation_base(request, page_pid, anno_pid, reverse('book_page_viewer', kwargs={'book_id': book_id, 'page_id': page_id}))
 
 
 @login_required(login_url=reverse_lazy('rome_login'))
@@ -871,7 +800,7 @@ def edit_print_annotation(request, print_id, anno_id):
     logger.debug( '\n\nstarting edit_print_annotation()' )
     anno_pid = f'{PID_PREFIX}:{anno_id}'
     print_pid = f'{PID_PREFIX}:{print_id}'
-    return edit_annotation_base(request, print_pid, anno_pid, reverse('specific_print', kwargs={'print_id': print_id}))
+    return annotation_forms.edit_annotation_base(request, print_pid, anno_pid, reverse('specific_print', kwargs={'print_id': print_id}))
 
 
 @login_required(login_url=reverse_lazy('rome_login'))

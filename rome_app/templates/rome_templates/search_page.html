@@ -8,6 +8,35 @@
  var book_to_title = []; //for displaying book titles, keyed by pid
  var appended_books = [];
  var appended_prints = [];
+ var bdr_requests = [];
+ var bdr_failed = false;
+
+ function cancel_bdr_requests() {
+    while (bdr_requests.length) {
+        bdr_requests.pop().abort();
+    }
+ }
+
+ function bdr_request_failed(xhr, status) {
+    if (status === 'abort' || bdr_failed) {
+        return;
+    }
+    bdr_failed = true;
+    $('#bdr-search-notice').removeAttr('hidden');
+    $('#num_results').text('Some search results could not be loaded.');
+    cancel_bdr_requests();
+ }
+
+ function request_bdr(url, on_success) {
+    if (!bdr_failed) {
+        var request = $.ajax({
+            url: url,
+            dataType: 'jsonp',
+            timeout: {{ bdr_browser_timeout_ms }}
+        }).done(on_success).fail(bdr_request_failed);
+        bdr_requests.push(request);
+    }
+ }
 
  //SEARCH LOGIC FUNCTIONS:
 
@@ -26,9 +55,14 @@
  }
 
  function submit_search(){
+    cancel_bdr_requests();
+    bdr_failed = false;
+    $('#bdr-search-notice').attr('hidden', 'hidden');
+    clear_results();
+    $('#num_results').text('Loading results…');
  	var searchterm = $("#search")[0].value;
  	//TO-DO - this max row limit on bdr requests means sometimes we don't get ALL the results...
- 	$.getScript("{{searchquery}}+"+ searchterm +"&callback=result_response&rows=500"); 
+    request_bdr("{{searchquery|escapejs}}+" + encodeURIComponent(searchterm) + "&rows=500", result_response);
  }
  
 function clear_results(){
@@ -43,6 +77,7 @@ function clear_results(){
 
  //callback from search query - get a list of response doc pids
  function result_response(data){
+    if (bdr_failed) { return; }
  	clear_results();
  	var num = data.response.numFound;
  	if (num > 500){
@@ -58,11 +93,12 @@ function clear_results(){
 
  //sort response docs by book by issuing another request to get the full doc for each result pid
  function group_by_book(resultpid){
- 	$.getScript("{{pagequery}}"+resultpid+"/?q=&callback=get_page_book");
+    request_bdr("{{pagequery|escapejs}}" + encodeURIComponent(resultpid) + "/?q=", get_page_book);
  }
 
 //callback from group_by_book request - get book information from page doc and sort accordingly, special case for prints
  function get_page_book(page_data){
+    if (bdr_failed) { return; }
  	var bookpid = null;
  	var booktitle = null;
  	var pagepid = page_data.pid;
@@ -266,7 +302,9 @@ function clear_results(){
 {% endblock %}
 
 {% block content %}
-	<input type="text" id="search" onkeyup="inputKeyUp(event)"></input>
+    <div id="bdr-search-notice" hidden>{% include "rome_templates/bdr_notice.html" %}</div>
+    <label for="search">Search the collection</label>
+	<input type="text" id="search" onkeyup="inputKeyUp(event)">
 	<button id="searchbutton">Search</button>
 	<div><span id= "num_results"></span></div>
 	<div id = "books" style = "margin-top: 20px"></div>
