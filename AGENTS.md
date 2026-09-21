@@ -2,6 +2,8 @@
 
 This file defines the canonical coding directives for this repository.
 
+Keep this `AGENTS.md` file at no more than 300 lines, counting blank lines and the final `---`. When adding guidance, shorten or remove repeated material first; keep repository-specific instructions and the project index useful.
+
 If other instruction files exist (Copilot, IDE rules, contributor docs) and conflict with this file, follow this file and treat the others as stale.
 
 
@@ -15,7 +17,6 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 - [Tests](#tests)
 - [Change workflow expectations](#change-workflow-expectations)
 - [Privacy and publication](#privacy-and-publication)
-- [If instructions are missing or ambiguous](#if-instructions-are-missing-or-ambiguous)
 - [Agent project index](#agent-project-index)
 
 
@@ -39,7 +40,6 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 - Run Django management commands via: `uv run ./manage.py THE-COMMAND`
 - `manage.py` loads the environment file from the enclosing directory. Before running a management command, make sure its selected `DJANGO_SETTINGS_MODULE`, database, and BDR service are appropriate for the task.
 - Do not run `run_integration_tests.py` by default. It loads the normal environment and calls a live BDR service; use it only when the task requires live integration coverage and the environment has been checked.
-- When a standalone validator or one-off Python helper needs a missing package, use `uv run --no-project --with PACKAGE python SCRIPT ARGS`. Try this before reporting validation as blocked. Do not add temporary helper dependencies to `pyproject.toml` or install them globally.
 
 
 ## Coding directives (Python)
@@ -63,7 +63,6 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 ### Functions and control flow
 
 - Prefer single-return functions: use local variables and a final return when that remains clear.
-- Do not define functions inside other functions.
 - Favor clarity and explicitness over cleverness.
 - Match the surrounding legacy style only where doing so is required for a small, safe change. Apply these directives to new code without turning a focused task into a broad rewrite.
 
@@ -83,15 +82,7 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 
 ### Docstrings
 
-- Use triple-quoted docstrings.
-- Write docstrings in present tense, with triple quotes on their own lines.
-  - Good:
-    ```python
-    """
-    Parses ...
-    """
-    ```
-  - Avoid: `"""Parse ..."""`
+- Write triple-quoted docstrings in present tense (for example, "Parses ..."), with the opening and closing triple quotes on their own lines.
 - The last line of non-test function docstrings should be `Called by: the_caller_function()` or, for a caller in another class or module, `Called by: module.Class.the_caller_function()`.
 - Start test-function docstring text with `Checks...`.
 - For header comments inside functions, start the comment with two hashes, for example `## does this`.
@@ -131,7 +122,6 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 ### Imports and dependencies
 
 - `views.py` should primarily import Django response/request primitives and the minimal set of functions and classes needed by each endpoint.
-- Put new view helpers in `rome_app/lib/`, not in `views.py`.
 - Avoid import-time network or database work. `rome_app/app_settings.py` already reads required environment values at import time, so tests and scripts must establish those values before Django setup.
 
 
@@ -152,16 +142,12 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 - Check changed Python files with VS Code's Pylance, using the project's interpreter and type-checking settings. If Pylance is unavailable, use Pyright with matching settings and Django type definitions. Different type-definition versions can produce different results; a standalone check with newer definitions does not establish that the editor is clear. Do not suppress diagnostics to work around missing definitions.
 - Unit tests belong in `unit_tests/`. BDR HTTP calls are isolated with `BdrMock` in `unit_tests/http_mock.py`, using data from `unit_tests/responses_data.py` or small synthetic examples. The mock rejects unexpected network requests.
 - Live-service tests belong in `integration_tests/` and run through `uv run ./run_integration_tests.py` only when live integration coverage is intentional.
-- New behavior should usually have a focused test covering:
-  - The expected path.
-  - At least one failure or edge case.
+- New behavior should usually have a focused test covering the expected path and at least one failure or edge case.
 - Front-end changes should preserve the accessibility checks in `unit_tests/test_views.py`, including shared color contrast, disallowed inline colors, image alternative text, frame titles, and representative rendered pages.
 - BDR query tests may match an encoded URL and its query string exactly. If a query changes intentionally, update both the behavior and its mocked URL or matcher.
 
 
 ## Change workflow expectations
-
-When implementing a change, especially from an issue or task:
 
 1. Read the relevant surrounding code and match established behavior.
 2. Make the smallest correct change that satisfies the request.
@@ -175,8 +161,7 @@ When implementing a change, especially from an issue or task:
 - When issue-based work is authorized, organize each issue around one clear outcome and create a branch for its file changes. Include the issue number and a short description in the branch name, and record it in work reports. Reuse the current issue branch when it already matches the task. A request to change local files does not by itself authorize creating an issue or posting comments.
 - Save requested plans, documentation, and code changes locally, leaving them uncommitted for the user's review unless the user explicitly requests a commit. Preserve the user's manual edits during revisions.
 - Report the files changed, checks actually performed, and anything needing review. Distinguish work ready for review from work accepted by the user, and distinguish local, committed, and pushed changes. Link existing issues, commits, and pull requests when relevant.
-- Keep the issue open for review and iteration. A finished draft or implementation report does not mean the user has accepted the work or wants the issue closed.
-- Use plain, direct language in reports, documentation, and issue or pull-request text. State who does what, in what order, and why it matters; use numbered steps when the order matters.
+- Ask questions only when necessary to proceed. Otherwise, state reasonable assumptions and implement. If blocked, report what you tried, what you found, and a concrete next step.
 
 ### GitHub attribution
 
@@ -213,14 +198,11 @@ When implementing a change, especially from an issue or task:
 - Only the user closes issues unless the user specifically asks Codex to close an identified issue. Keep issues open by default, even after requested work, tests, review, commits, pushes, or merges are complete. A request to finish the task or approval of a plan is not permission to close the issue.
 - Without that specific request, do not close issues through the UI, CLI, API, tools, or a comment-and-close action. Do not arrange automatic closure through commit messages, pull-request descriptions, links, or automation.
 - Use ordinary references such as `Refs #123` or an issue URL unless closure is authorized. Do not use closing keywords such as `Closes`, `Fixes`, or `Resolves` with an issue reference or add links that close the issue when merged. Before an authorized merge, check for existing automatic closure instructions and links; remove them if authorized or leave the merge pending if it would close an issue without permission.
-- For planning work, develop and save the plan locally, post a summary if authorized, and leave the changes uncommitted and the issue open for review. Committing, continuing revisions, and closing the issue are separate decisions.
 
 ### Commit messages
 
-- Apply these conventions only after the user has authorized a commit under [Commit authorization](#commit-authorization).
-- Group related files into logical, focused commits; do not require a separate commit for every file.
-- Keep each commit message brief, with no more than ten words.
-- Write messages in the present tense so they complete the phrase "This commit..." Begin with a fitting verb such as "Adds," "Implements," or "Updates."
+- After [commit authorization](#commit-authorization), group related files into logical, focused commits; do not require a separate commit for every file.
+- Use no more than ten words per commit message. Write in the present tense to complete "This commit...", beginning with a verb such as "Adds," "Implements," or "Updates."
 
 
 ## Privacy and publication
@@ -232,17 +214,6 @@ When implementing a change, especially from an issue or task:
 - Before every repository post or edit, review the exact outgoing text, examples, links, screenshots, and attachments for sensitive information. Check combinations of details as well as individual values. Information already present in source code or an earlier post is not automatic permission to repeat it.
 - When posting is authorized and the complete content is clearly safe to publish, proceed without another approval request. If sensitivity is uncertain, prepare sanitized wording, show it in the private conversation, explain the uncertainty without repeating sensitive values, and wait for confirmation of that exact text before posting. Never use an issue or comment to ask whether sensitive information is safe to disclose.
 - Keep full server filesystem paths out of documentation, examples, and agent notes. Keep all server-deployment documentation, including any mention of deployment caller scripts, outside READMEs. When dependency migration includes a deployment caller, create it outside the Git repository.
-
-
-## If instructions are missing or ambiguous
-
-- Do not ask questions unless absolutely necessary to proceed.
-- Make reasonable assumptions, state them explicitly, then implement.
-- Do not assume permission to commit or close an issue. When that permission is absent or unclear, complete the authorized local work, leave it uncommitted, and keep the issue open as described above.
-- If blocked, provide:
-  - What you tried.
-  - What you found in the repository.
-  - A concrete next step: a command, file to edit, or minimal decision needed.
 
 
 ## Agent project index
