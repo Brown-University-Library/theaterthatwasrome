@@ -1,0 +1,10 @@
+{% extends "rome_templates/base.html" %}
+{% block page_heading %}<h1>Content temporarily unavailable</h1>{% endblock %}
+{% block content %}
+  {% include "rome_templates/bdr_notice.html" %}
+  {% if write_failed %}
+    <p>We could not confirm whether your annotation was saved. Before submitting it again,
+      check the record when the repository is available.</p>
+  {% endif %}
+  <p><a href="{% url 'index' %}">Return to the home page</a></p>
+{% endblock %}

@@ -53,6 +53,7 @@
       {% endblock %}
       <main id="page_body">
             {% block page_heading %}<h1 class="sr-only">{{ title }}</h1>{% endblock %}
+            {% if bdr_unavailable %}{% include "rome_templates/bdr_notice.html" %}{% endif %}
             {% block content %}
             {% endblock content %}
       </main>

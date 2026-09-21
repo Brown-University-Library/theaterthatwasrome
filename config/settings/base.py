@@ -1,3 +1,4 @@
+import math
 import os
 
 from django.core.exceptions import ImproperlyConfigured
@@ -14,12 +15,31 @@ def get_env_setting(setting):
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
+def positive_env_seconds(name: str, default: float) -> float:
+    """
+    Reads a finite, positive timeout in seconds from the environment.
+    Called by: config.settings.base module initialization
+    """
+    try:
+        value = float(os.environ.get(name, str(default)))
+    except ValueError as exc:
+        raise ImproperlyConfigured(f'{name} must be a positive number of seconds.') from exc
+    if not math.isfinite(value) or value <= 0:
+        raise ImproperlyConfigured(f'{name} must be a positive number of seconds.')
+    return value
+
+
+BDR_CONNECT_TIMEOUT = positive_env_seconds('ROME_BDR_CONNECT_TIMEOUT', 5.0)
+BDR_READ_TIMEOUT = positive_env_seconds('ROME_BDR_READ_TIMEOUT', 10.0)
+
 MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'config.middleware.bdr_failure_middleware.BdrFailureMiddleware',
 ]
 
 TEMPLATES = [
@@ -87,9 +107,16 @@ LOGGING = {
             'datefmt': '%d/%b/%Y %H:%M:%S',
         },
     },
-    'filters': {'require_debug_false': {'()': 'django.utils.log.RequireDebugFalse'}},
+    'filters': {
+        'require_debug_false': {'()': 'django.utils.log.RequireDebugFalse'},
+        'skip_handled_bdr_failure': {'()': 'rome_app.lib.bdr_failure.SkipHandledBdrFailure'},
+    },
     'handlers': {
-        'mail_admins': {'level': 'ERROR', 'filters': ['require_debug_false'], 'class': 'django.utils.log.AdminEmailHandler'},
+        'mail_admins': {
+            'level': 'ERROR',
+            'filters': ['require_debug_false', 'skip_handled_bdr_failure'],
+            'class': 'django.utils.log.AdminEmailHandler',
+        },
         'log_file': {
             # 'level': 'DEBUG',
             'level': os.environ.get('LOG_LEVEL', 'INFO'),  # add LOG_LEVEL='DEBUG' to the .env file to see debug messages
