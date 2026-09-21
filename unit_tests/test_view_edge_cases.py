@@ -2,14 +2,14 @@ import datetime
 import json
 from unittest.mock import patch
 
-import requests
-import responses
+import httpx2
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from rome_app import models
 from rome_app.lib import annotation_helpers, version_helper
 
+from . import http_mock as bdr_mock
 from . import responses_data
 
 
@@ -18,15 +18,15 @@ def mock_page_responses(page_data: dict[str, object]) -> None:
     Supplies local responses for a book and its page.
     Called by: TestPageMetadata.test_missing_annotation_metadata(), TestPageMetadata.test_missing_pagination()
     """
-    responses.reset()
-    responses.add(
-        responses.GET,
+    bdr_mock.reset()
+    bdr_mock.add(
+        bdr_mock.GET,
         'https://localhost/api/items/testsuite:123/',
         body=responses_data.BOOK_ITEM_API_DATA,
         content_type='application/json',
     )
-    responses.add(
-        responses.GET,
+    bdr_mock.add(
+        bdr_mock.GET,
         'https://localhost/api/items/testsuite:123456/',
         body=json.dumps(page_data),
         content_type='application/json',
@@ -34,7 +34,7 @@ def mock_page_responses(page_data: dict[str, object]) -> None:
 
 
 class TestPageMetadata(TestCase):
-    @responses.activate
+    @bdr_mock.activate
     def test_missing_annotation_metadata(self) -> None:
         """
         Checks that absent or empty annotation metadata still allows a book page to render.
@@ -54,7 +54,7 @@ class TestPageMetadata(TestCase):
         response = self.client.get(reverse('book_page_viewer', kwargs={'book_id': '123', 'page_id': '123456'}))
         self.assertContains(response, 'Image 1')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_missing_pagination(self) -> None:
         """
         Checks that missing page numbers fall back to the page ID and valid numbers are preserved.
@@ -75,14 +75,14 @@ class TestPageMetadata(TestCase):
 
 
 class TestAnnotationOrigin(TestCase):
-    @responses.activate
+    @bdr_mock.activate
     def test_origin_date_text(self) -> None:
         """
         Checks that an origin date comes from XML text and that the impression date remains available.
         """
         url = 'https://localhost/storage/testsuite:234/MODS/'
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             url,
             body=(
                 '<mods xmlns="http://www.loc.gov/mods/v3"><originInfo>'
@@ -96,7 +96,7 @@ class TestAnnotationOrigin(TestCase):
         self.assertEqual(annotation['has_elements']['origin'], 1)
         self.assertEqual(annotation['impression'], '1695')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_empty_origin(self) -> None:
         """
         Checks that empty origin metadata does not show a blank origin field.
@@ -104,9 +104,9 @@ class TestAnnotationOrigin(TestCase):
         url = 'https://localhost/storage/testsuite:234/MODS/'
         for origin_xml in ['<originInfo/>', '<originInfo><dateIssued/></originInfo>']:
             with self.subTest(origin_xml=origin_xml):
-                responses.reset()
-                responses.add(
-                    responses.GET,
+                bdr_mock.reset()
+                bdr_mock.add(
+                    bdr_mock.GET,
                     url,
                     body=f'<mods xmlns="http://www.loc.gov/mods/v3">{origin_xml}</mods>',
                     content_type='text/xml',
@@ -157,32 +157,32 @@ class TestViewResponses(TestCase):
         self.assertContains(response, '<i>1600</i> — <i>1670</i>', html=True)
         self.assertEqual(response.context['num_results'], 3)
 
-    @responses.activate
+    @bdr_mock.activate
     def test_metadata_request_failures(self) -> None:
         """
-        Checks that BDR HTTP errors and timeouts keep the existing page and print error responses.
+        Checks that BDR HTTP errors and timeouts keep the existing page and print error bdr_mock.
         """
         page_url = reverse('book_page_viewer', kwargs={'book_id': '123', 'page_id': '123456'})
         print_url = reverse('specific_print', kwargs={'print_id': '123'})
         for route in [page_url, print_url]:
-            for failure in ['Service unavailable', requests.Timeout('BDR timed out')]:
+            for failure in ['Service unavailable', httpx2.ReadTimeout('BDR timed out')]:
                 with self.subTest(route=route, failure=type(failure).__name__):
-                    responses.reset()
-                    responses.add(
-                        responses.GET,
+                    bdr_mock.reset()
+                    bdr_mock.add(
+                        bdr_mock.GET,
                         'https://localhost/api/items/testsuite:123456/',
                         body=responses_data.ITEM_API_DATA,
                         content_type='application/json',
                     )
-                    responses.add(
-                        responses.GET,
+                    bdr_mock.add(
+                        bdr_mock.GET,
                         'https://localhost/api/items/testsuite:123/',
                         body=failure,
                         status=503,
                     )
                     response = self.client.get(route)
-                    self.assertEqual(response.status_code, 500)
-                    self.assertIn(b'retrieving content', response.content)
+                    self.assertEqual(response.status_code, 503)
+                    self.assertIn(b'temporarily unavailable', response.content)
 
     def test_version_timing_with_timezone(self) -> None:
         """
