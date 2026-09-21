@@ -2,6 +2,8 @@
 
 This file defines the canonical coding directives for this repository.
 
+Keep this `AGENTS.md` file at no more than 300 lines, counting blank lines and the final `---`. When adding guidance, shorten or remove repeated material first; keep repository-specific instructions and the project index useful.
+
 If other instruction files exist (Copilot, IDE rules, contributor docs) and conflict with this file, follow this file and treat the others as stale.
 
 
@@ -14,7 +16,7 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 - [Front-end change guidance](#front-end-change-guidance)
 - [Tests](#tests)
 - [Change workflow expectations](#change-workflow-expectations)
-- [If instructions are missing or ambiguous](#if-instructions-are-missing-or-ambiguous)
+- [Privacy and publication](#privacy-and-publication)
 - [Agent project index](#agent-project-index)
 
 
@@ -61,7 +63,6 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 ### Functions and control flow
 
 - Prefer single-return functions: use local variables and a final return when that remains clear.
-- Do not define functions inside other functions.
 - Favor clarity and explicitness over cleverness.
 - Match the surrounding legacy style only where doing so is required for a small, safe change. Apply these directives to new code without turning a focused task into a broad rewrite.
 
@@ -74,21 +75,14 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 ### HTTP and networking
 
 - Prefer `httpx` for a new, isolated HTTP integration.
-- Existing BDR and Turnstile code uses `requests`, and the unit suite mocks it with `responses`. Do not partially migrate an existing request path as an incidental change.
+- BDR calls use `httpx2` through `rome_app/lib/bdr_client.py`; reuse that client for new BDR calls. Turnstile verification still uses `requests`. Do not partially migrate an existing request path as an incidental change.
 - If a task intentionally migrates an existing request path, update its dependency declaration, lockfile, mocks, timeout handling, and error handling together.
 - Add an explicit timeout to new network calls.
+- Preserve the BDR client's explicit connection and read timeouts, its handling of temporary failures through `BdrUnavailable`, and its rule against automatically retrying or following redirects for annotation writes.
 
 ### Docstrings
 
-- Use triple-quoted docstrings.
-- Write docstrings in present tense, with triple quotes on their own lines.
-  - Good:
-    ```python
-    """
-    Parses ...
-    """
-    ```
-  - Avoid: `"""Parse ..."""`
+- Write triple-quoted docstrings in present tense (for example, "Parses ..."), with the opening and closing triple quotes on their own lines.
 - The last line of non-test function docstrings should be `Called by: the_caller_function()` or, for a caller in another class or module, `Called by: module.Class.the_caller_function()`.
 - Start test-function docstring text with `Checks...`.
 - For header comments inside functions, start the comment with two hashes, for example `## does this`.
@@ -128,7 +122,6 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 ### Imports and dependencies
 
 - `views.py` should primarily import Django response/request primitives and the minimal set of functions and classes needed by each endpoint.
-- Put new view helpers in `rome_app/lib/`, not in `views.py`.
 - Avoid import-time network or database work. `rome_app/app_settings.py` already reads required environment values at import time, so tests and scripts must establish those values before Django setup.
 
 
@@ -147,18 +140,16 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 - Use Django's test framework.
 - The canonical unit suite is `uv run ./run_tests.py`; this is also the command run by CI.
 - Check changed Python files with VS Code's Pylance, using the project's interpreter and type-checking settings. If Pylance is unavailable, use Pyright with matching settings and Django type definitions. Different type-definition versions can produce different results; a standalone check with newer definitions does not establish that the editor is clear. Do not suppress diagnostics to work around missing definitions.
-- Unit tests belong in `unit_tests/`. HTTP behavior is normally isolated with `responses`, using data from `unit_tests/responses_data.py`.
+- Pylance must load `typings/bdrxml/` for the dynamically generated XML fields. When VS Code opens the enclosing directory, set `python.analysis.stubPath` to `${workspaceFolder}/ttwr/typings` in that workspace's `.vscode/settings.json`; when it opens this repository, the default `typings` path applies.
+- Run `ruff check` on changed Python files using this repository's `ruff.toml`, and check VS Code's Problems panel when available. Pylance/Pyright does not check Ruff warnings; a temporary checker configuration does not configure the editor.
+- Unit tests belong in `unit_tests/`. BDR HTTP calls are isolated with `BdrMock` in `unit_tests/http_mock.py`, using data from `unit_tests/responses_data.py` or small synthetic examples. The mock rejects unexpected network requests.
 - Live-service tests belong in `integration_tests/` and run through `uv run ./run_integration_tests.py` only when live integration coverage is intentional.
-- New behavior should usually have a focused test covering:
-  - The expected path.
-  - At least one failure or edge case.
+- New behavior should usually have a focused test covering the expected path and at least one failure or edge case.
 - Front-end changes should preserve the accessibility checks in `unit_tests/test_views.py`, including shared color contrast, disallowed inline colors, image alternative text, frame titles, and representative rendered pages.
 - BDR query tests may match an encoded URL and its query string exactly. If a query changes intentionally, update both the behavior and its mocked URL or matcher.
 
 
 ## Change workflow expectations
-
-When implementing a change, especially from an issue or task:
 
 1. Read the relevant surrounding code and match established behavior.
 2. Make the smallest correct change that satisfies the request.
@@ -166,21 +157,65 @@ When implementing a change, especially from an issue or task:
 4. If dependencies change, update both `pyproject.toml` and `uv.lock`, then verify with the appropriate locked dependency group.
 5. If tests cannot run in the environment, still write or adjust the tests and state exactly what should be run.
 
+### Issue-based work and review
+
+- Work directly from the current user request. Issues, formal templates, labels, preliminary discussions, and decision comments are not prerequisites for authorized local work.
+- When issue-based work is authorized, organize each issue around one clear outcome and create a branch for its file changes. Include the issue number and a short description in the branch name, and record it in work reports. Reuse the current issue branch when it already matches the task. A request to change local files does not by itself authorize creating an issue or posting comments.
+- Save requested plans, documentation, and code changes locally, leaving them uncommitted for the user's review unless the user explicitly requests a commit. Preserve the user's manual edits during revisions.
+- Report the files changed, checks actually performed, and anything needing review. Distinguish work ready for review from work accepted by the user, and distinguish local, committed, and pushed changes. Link existing issues, commits, and pull requests when relevant.
+- Ask questions only when necessary to proceed. Otherwise, state reasonable assumptions and implement. If blocked, report what you tried, what you found, and a concrete next step.
+
+### GitHub attribution
+
+- Every GitHub post or text update must visibly identify Codex as the agent that created or edited it. This includes issue descriptions, pull-request descriptions, comments, reviews, and discussions; do not rely on the displayed account name to convey authorship.
+- Begin new issue descriptions with `Created by Codex at the user's request.` Keep this attribution separate from the user's prompt. For other posts or edits, use an accurate visible attribution such as `Posted by Codex` or `Edited by Codex`; begin issue comments with `Codex response` as described below.
+- Distinguish who posted the material from who wrote it: identify quoted prompts as the user's words, and identify Codex's summaries, proposals, and reports as Codex's work.
+
+### Issue bodies and user prompts
+
+- When the user provides a prompt and asks to post it as an issue, put the complete, exact prompt in the issue description after the separate Codex attribution line. Preserve wording, spelling, punctuation, Markdown, links, paragraph breaks, and order. Do not summarize, reorganize, correct, omit parts, or add completion criteria. A prompt comment does not substitute for the issue body.
+- Apply [Privacy and publication](#privacy-and-publication) before reproducing a prompt. When privacy requires redaction, mark each omission explicitly and explain outside the prompt that redactions were necessary. If the user requests a sanitized summary instead of a quotation, write a fresh summary and label it as Codex's summary of the request. Put any authorized Codex interpretation or work report in a separately attributed comment.
+- When asked to draft an issue instead, use **Goal** for the intended outcome, **Context** for relevant background and constraints, and **Tasks** for the requested actions. Make clear whether the user wants advice, a plan, documentation, or implementation. Add **Completion criteria** only when observable checks would clarify what counts as done. Keep the structure proportional to the work.
+- Use a structured body argument when available, or a temporary file with `--body-file` when using `gh`. After posting or editing, fetch the issue and verify the body and visible attribution. For a supplied prompt, compare its text against the original, allowing only explicitly marked privacy redactions. Return the issue link.
+
+### GitHub issue comments
+
+- Post a comment only when the user asks or has already authorized it. Authorization to maintain prompt and work records for an issue can cover later updates within that scope. A request to implement a change does not by itself authorize a comment, and a request to comment does not by itself authorize implementation or commits.
+- Before posting, read the target issue, all its comments, and applicable `AGENTS.md` files. Address the current request within its stated scope; use newer maintainer guidance to resolve older conflicting comments.
+- Begin comments with `Codex response` and identify the response type, such as **answer**, **advice**, **proposal**, **prompt record**, or **implementation report**. Clearly distinguish an agent proposal from an accepted maintainer decision.
+- When asked to record a prompt as a comment, preserve the user's wording in a Markdown blockquote under `Codex response — **prompt record**`. Identify it as the user's prompt from the local work session and keep explanations outside the quotation. Apply [Privacy and publication](#privacy-and-publication), marking any required omissions explicitly. Label a requested sanitized summary as Codex's summary rather than presenting it as the user's exact words.
+- Use authorized comments to record substantive prompts and work at useful milestones; every local exchange does not need a GitHub update. Implementation reports should describe what changed, what was verified, any remaining work or review, and whether changes are local, committed, or pushed. Posting a report does not authorize a commit or issue closure.
+- Use a structured comment-body argument when available. If using `gh`, put multiline Markdown in a temporary file and pass it with `--body-file`. Verify the posted text and return its direct link. If a posting attempt has an uncertain result, check existing comments before retrying to avoid duplicates.
+
+### Commit authorization
+
+- Create or amend a commit only when the user explicitly asks Codex to commit the changes in question. This applies to Git commands and equivalent tools or APIs. A request to develop a plan, implement a change, save files, create a branch, post a summary, or finish the work does not authorize a commit.
+- Review approval, a suggested commit message, or the user saying they might commit the work is not an instruction for Codex to commit. Commit-message conventions describe how to write an authorized commit; they do not grant permission to make one.
+- Apply an explicit commit instruction only to its stated changes and scope. Permission for an earlier task or commit does not automatically cover later revisions. Do not ask again when the current changes are already covered by clear authorization.
+- If commit authorization is absent or unclear, finish the authorized local work and report that it is ready for review and uncommitted. Do not delay that work to ask whether to commit.
+- Permission to commit does not by itself authorize pushing, creating or merging a pull request, or closing an issue. Follow the user's instructions for each action separately.
+
+### Issue closure
+
+- Only the user closes issues unless the user specifically asks Codex to close an identified issue. Keep issues open by default, even after requested work, tests, review, commits, pushes, or merges are complete. A request to finish the task or approval of a plan is not permission to close the issue.
+- Without that specific request, do not close issues through the UI, CLI, API, tools, or a comment-and-close action. Do not arrange automatic closure through commit messages, pull-request descriptions, links, or automation.
+- Use ordinary references such as `Refs #123` or an issue URL unless closure is authorized. Do not use closing keywords such as `Closes`, `Fixes`, or `Resolves` with an issue reference or add links that close the issue when merged. Before an authorized merge, check for existing automatic closure instructions and links; remove them if authorized or leave the merge pending if it would close an issue without permission.
+
 ### Commit messages
 
-- Group related files into logical, focused commits; do not require a separate commit for every file.
-- Keep each commit message brief, with no more than ten words.
-- Write messages in the present tense so they complete the phrase "This commit..." Begin with a fitting verb such as "Adds," "Implements," or "Updates."
+- After [commit authorization](#commit-authorization), group related files into logical, focused commits; do not require a separate commit for every file.
+- Use no more than ten words per commit message. Write in the present tense to complete "This commit...", beginning with a verb such as "Adds," "Implements," or "Updates."
 
 
-## If instructions are missing or ambiguous
+## Privacy and publication
 
-- Do not ask questions unless absolutely necessary to proceed.
-- Make reasonable assumptions, state them explicitly, then implement.
-- If blocked, provide:
-  - What you tried.
-  - What you found in the repository.
-  - A concrete next step: a command, file to edit, or minimal decision needed.
+- Apply these rules to public and private repositories, including tracked files, agent notes, issue titles and bodies, comments, pull requests, commit messages, and attachments. Permission to investigate using conversation, local files, or tool output is not permission to publish that information.
+- Do not publish explicit server names, hostnames, server IP addresses, credentials, tokens, private endpoints, personal information, cookies, session data, or unreviewed browser artifacts. Use generic descriptions and relative paths or variable names instead of full local or server filesystem paths.
+- Keep sensitive working notes out of tracked files. Do not publish known or suspected vulnerabilities, affected live systems, exploit steps, or details that could help someone exploit a weakness. Discuss findings privately with the user; describe repository updates in terms of the general improvement and safe validation results.
+- Write fresh, minimal summaries for repository reports. Do not paste private conversation excerpts, raw logs, tracebacks, configuration, commands, or tool output. Explicitly requested prompt records follow the prompt rules above only after the same privacy review; they never authorize publishing sensitive content.
+- Before every repository post or edit, review the exact outgoing text, examples, links, screenshots, and attachments for sensitive information. Check combinations of details as well as individual values. Information already present in source code or an earlier post is not automatic permission to repeat it.
+- When posting is authorized and the complete content is clearly safe to publish, proceed without another approval request. If sensitivity is uncertain, prepare sanitized wording, show it in the private conversation, explain the uncertainty without repeating sensitive values, and wait for confirmation of that exact text before posting. Never use an issue or comment to ask whether sensitive information is safe to disclose.
+- Keep full server filesystem paths out of documentation, examples, and agent notes. Keep all server-deployment documentation, including any mention of deployment caller scripts, outside READMEs. When dependency migration includes a deployment caller, create it outside the Git repository.
 
 
 ## Agent project index
@@ -193,6 +228,7 @@ This Django application serves The Theater That Was Rome, a scholarly site for e
 - `rome_app/urls_app.py`: application route map. Start here to connect a public URL to its view.
 - `rome_app/views.py`: page assembly, BDR lookups, annotation forms, and response handling. This is a large legacy module; search for the route's named view before reading it broadly.
 - `rome_app/models.py`: local Django models plus non-database wrappers for BDR objects and MODS annotations.
+- `rome_app/lib/annotation_forms.py`: the shared helper for editing book and print annotations. `rome_app/lib/bdr_client.py` handles BDR HTTP calls; `rome_app/lib/bdr_failure.py` and `config/middleware/bdr_failure_middleware.py` handle temporary service failures.
 - `rome_app/forms.py`, `rome_app/widgets.py`, and `rome_app/admin.py`: editorial forms, add-another popup behavior, and admin registration.
 - `rome_app/templates/rome_templates/`: site templates. Most pages extend `base.html`; list pages commonly extend `result_base.html`.
 - `rome_app/static/rome/`: shared CSS, page-specific CSS, legacy JavaScript, and images.
@@ -224,6 +260,7 @@ This Django application serves The Theater That Was Rome, a scholarly site for e
 - `Annotation` in `rome_app/models.py` translates cleaned form data to and from MODS XML using `bdrxml` and `eulxml`.
 - New annotations are sent to BDR with POST; edits are sent with PUT. These paths require BDR identity and authorization environment values. Never exercise a live write while running ordinary tests or exploratory commands.
 - A MODS name links to a local biography through the biography's zero-padded `trp_id` in an `xlink:href`; its role text must match a local `Role`. Invalid existing metadata can raise `InvalidNameError` and send an administrator email.
+- An existing annotation's genre text must match a local `Genre`. `MissingGenreError` produces a correction page through the shared editing helper, with HTTP 409 and no caching. Opening the page does not add genre records or change the annotation. The editor responsible for genre data must resolve the mismatch before the edit form can load. `unit_tests/test_annotation_genres.py` covers both edit routes and recovery after correction.
 - The small `new_genre`, `new_role`, and `new_biography` endpoints support the custom add-another popup used by annotation forms. Preserve the popup response contract when changing these forms.
 
 ### Settings and environment behavior
@@ -253,7 +290,8 @@ This Django application serves The Theater That Was Rome, a scholarly site for e
 ### Test boundaries and common gotchas
 
 - `unit_tests/test_views.py` contains most page behavior tests and extensive exact BDR mocks. `unit_tests/test_models.py` covers selected model behavior; `unit_tests/test_middleware.py` covers Turnstile helpers.
-- `run_tests.py` is the reliable, CI-matching entry point. The README explicitly labels its old installation commands as outdated.
+- `run_tests.py` is the reliable, CI-matching entry point. The current README documents installation with `uv sync --locked --group local`.
+- `unit_tests/test_bdr_failures.py` checks timeouts, temporary service failures, recovery, and annotation write failures. Keep those failures distinct from missing local editorial data, and preserve the rule against automatically retrying annotation writes.
 - Integration tests use the normal external environment and live records. Their expected identifiers and available records can become stale independently of the code.
 - Search for usages before editing duplicate or historical templates and image assets; a matching filename does not prove that a current view renders it.
 - The legacy code mixes formatting styles and places substantial work in `views.py` and `models.py`. Prefer focused improvements around the requested behavior instead of unrelated cleanup.

@@ -1,0 +1,9 @@
+{% extends "rome_templates/base.html" %}
+{% block page_heading %}<h1>Annotation needs a genre correction</h1>{% endblock %}
+{% block content %}
+  <p>The genre <strong>{{ genre_text }}</strong> is missing from the site's genre list.</p>
+  <p>Contact the site editor responsible for genre data. They can add the matching genre
+    or arrange a correction to this annotation. Then reopen the edit page.</p>
+  <p>The annotation has not been changed.</p>
+  <p><a href="{{ annotation_url }}">Back to the annotation</a></p>
+{% endblock %}

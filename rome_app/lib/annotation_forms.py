@@ -6,9 +6,10 @@ from django.core.mail import mail_admins
 from django.forms.formsets import formset_factory
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, HttpResponseServerError
 from django.shortcuts import render
+from django.utils.cache import add_never_cache_headers
 
 from rome_app.lib.bdr_client import BdrUnavailable
-from rome_app.models import Annotation, InvalidNameError, zoom_viewer_url
+from rome_app.models import Annotation, InvalidNameError, MissingGenreError, zoom_viewer_url
 
 logger = logging.getLogger('rome')
 
@@ -67,6 +68,24 @@ def edit_annotation_base(request: HttpRequest, image_pid: str, anno_pid: str, re
     else:
         try:
             context_data.update(get_bound_edit_forms(annotation, AnnotationForm, PersonFormSet, InscriptionFormSet))
+        except MissingGenreError as exc:
+            logger.warning('annotation genre missing: anno_pid, ``%s``; genre_text, ``%s``', anno_pid, exc.genre_text)
+            response = render(
+                request,
+                'rome_templates/annotation_genre_error.html',
+                {
+                    'title': 'Annotation needs a genre correction',
+                    'common_style': 'rome/css/common.css',
+                    'usr_style': 'rome/css/content.css',
+                    'brown_image': 'rome/images/brown-logo.gif',
+                    'stg_image': 'rome/images/stg-logo.gif',
+                    'genre_text': exc.genre_text,
+                    'annotation_url': redirect_url,
+                },
+                status=409,
+            )
+            add_never_cache_headers(response)
+            return response
         except InvalidNameError as e:
             mail_admins(subject='TTWR create/edit annotation error', message=f'exception: {e}', fail_silently=False)
             return HttpResponse('Existing annotation is invalid. Email has been sent to bdr@brown.edu.')
