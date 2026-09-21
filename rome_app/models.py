@@ -37,6 +37,7 @@ class MissingGenreError(ValueError):
 
 
 ## Database Models --------------------------------------------------
+## Django ORM models stored in the local database, plus their field validators.
 
 
 # validate biography roles against Roles db table
@@ -195,16 +196,6 @@ class Essay(models.Model):
             return annotations
 
 
-def get_related_works_query(pids):
-    if pids is not None:
-        pidlist = ['pid:"%s:%s"' % (app_settings.PID_PREFIX, p) for p in pids.split(',')]
-        query = (
-            'rel_is_member_of_collection_ssim:"%s"+AND+display:BDR_PUBLIC+AND+(%s)&fl=primary_title,rel_has_pagination_ssim,rel_is_part_of_ssim,creator,pid,genre'
-            % (settings.TTWR_COLLECTION_PID, '+OR+'.join(pidlist))
-        )
-        return query
-
-
 class Static(models.Model):
     title = models.CharField(max_length=254)
     text = models.TextField()
@@ -267,6 +258,17 @@ class Role(models.Model):
 
 
 ## Non-Database Models ----------------------------------------------
+## BDR API/MODS wrappers and helpers; these classes do not define local database tables.
+
+
+def get_related_works_query(pids):
+    if pids is not None:
+        pidlist = ['pid:"%s:%s"' % (app_settings.PID_PREFIX, p) for p in pids.split(',')]
+        query = (
+            'rel_is_member_of_collection_ssim:"%s"+AND+display:BDR_PUBLIC+AND+(%s)&fl=primary_title,rel_has_pagination_ssim,rel_is_part_of_ssim,creator,pid,genre'
+            % (settings.TTWR_COLLECTION_PID, '+OR+'.join(pidlist))
+        )
+        return query
 
 
 def zoom_viewer_url(pid):
