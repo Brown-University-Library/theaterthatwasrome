@@ -1,17 +1,19 @@
 import json
 import logging
-from pathlib import Path
 import re
+from pathlib import Path
 from types import SimpleNamespace
-import responses
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
 from django.template.loader import render_to_string
 from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
+
 from rome_app import models, views
 
+from . import http_mock as bdr_mock
 from . import responses_data
 
 log = logging.getLogger(__name__)
@@ -249,7 +251,7 @@ class TestStaticViews(TestCase):
         self.assertContains(response, '<p>footnote text')  # make sure that footnote was rendered
         self.assertContains(response, 'aria-hidden="true" class="breadcrumb-separator"')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_rendered_views_avoid_bad_inline_contrast_colors(self):
         """
         Checks that representative rendered views for each stylesheet avoid the known bad inline text colors.
@@ -261,8 +263,8 @@ class TestStaticViews(TestCase):
         params = (
             'q=genre_aat:books+AND+name:%22Fr%C3%ABd%22&fq=object_type:implicit-set&fl=*&fq=discover:BDR_PUBLIC&rows=6000'
         )
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             f'{base_url}?{params}',
             body=responses_data.BIO_BOOKS,
             status=200,
@@ -270,8 +272,8 @@ class TestStaticViews(TestCase):
             match_querystring=True,
         )
         prints_params = 'q=(genre_aat:%22etchings%20(prints)%22+OR+genre_aat:%22engravings%20(prints)%22)+AND+name:%22Fr%C3%ABd%22&fq=object_type:implicit-set&fl=*&fq=discover:BDR_PUBLIC&rows=6000'
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             f'{base_url}?{prints_params}',
             body=responses_data.BIO_PRINTS,
             status=200,
@@ -279,8 +281,8 @@ class TestStaticViews(TestCase):
             match_querystring=True,
         )
         anno_search_url = f'https://localhost/api/search/?q=rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"+AND+object_type:%22annotation%22+AND+contributor:%22Fr%C3%ABd%22+AND+display:BDR_PUBLIC&rows=6000&fl=rel_is_annotation_of_ssim,primary_title,pid,nonsort'
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             anno_search_url,
             body=responses_data.ANNOTATIONS,
             status=200,
@@ -288,8 +290,8 @@ class TestStaticViews(TestCase):
             match_querystring=True,
         )
         pages_search_url = 'https://localhost/api/search/?q=(pid:test%5C:1234)+AND+display:BDR_PUBLIC&fl=pid,primary_title,nonsort,object_type,rel_is_part_of_ssim,rel_has_pagination_ssim&rows=50'
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             pages_search_url,
             body=responses_data.PAGES,
             status=200,
@@ -458,14 +460,14 @@ class TestTemplateImageAltText(TestCase):
 
 
 class TestBooksViews(TestCase):
-    @responses.activate
+    @bdr_mock.activate
     def test_book_list_api_error(self):
-        responses.add(responses.GET, f'https://localhost/api/collections/{settings.TTWR_COLLECTION_PID}/', status=500)
+        bdr_mock.add(bdr_mock.GET, f'https://localhost/api/collections/{settings.TTWR_COLLECTION_PID}/', status=500)
         url = reverse('books')
         response = self.client.get(url)
-        self.assertContains(response, 'error loading list of books', status_code=500)
+        self.assertContains(response, 'temporarily unavailable', status_code=503)
 
-    @responses.activate
+    @bdr_mock.activate
     def test_book_list(self):
         data = {
             'items': {
@@ -479,8 +481,8 @@ class TestBooksViews(TestCase):
                 ],
             },
         }
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             f'https://localhost/api/collections/{settings.TTWR_COLLECTION_PID}/',
             body=json.dumps(data),
             status=200,
@@ -491,10 +493,10 @@ class TestBooksViews(TestCase):
         self.assertContains(response, 'Full Title:')
         self.assertContains(response, 'ID: 1234abcd')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_book_not_found(self):
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/items/testsuite:123/',
             body='',
             status=404,
@@ -520,10 +522,10 @@ class TestBooksViews(TestCase):
         self.assertContains(response, 'src="https://localhost/viewers/image/zoom/testsuite:230606?first_child_only=1"')
         self.assertContains(response, 'title="Zoomable image viewer"')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_new_annotation_post(self):
-        responses.add(
-            responses.POST,
+        bdr_mock.add(
+            bdr_mock.POST,
             'https://localhost/api/items/v1/',
             body=json.dumps({'pid': 'testsuite:111111'}),
             status=200,
@@ -572,24 +574,24 @@ class TestBooksViews(TestCase):
 
 
 class TestPageViews(TestCase):
-    @responses.activate
+    @bdr_mock.activate
     def test_page_detail(self):
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/items/testsuite:123/',
             body=responses_data.BOOK_ITEM_API_DATA,
             status=200,
             content_type='application/json',
         )
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/items/testsuite:123456/',
             body=responses_data.ITEM_API_DATA,
             status=200,
             content_type='application/json',
         )
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/storage/testsuite:234/MODS/',
             body=responses_data.SAMPLE_ANNOTATION_XML,
             status=200,
@@ -601,24 +603,24 @@ class TestPageViews(TestCase):
         self.assertContains(response, 'src="https://localhost/viewers/image/zoom/testsuite:123456?first_child_only=1"')
         self.assertContains(response, 'title="Zoomable image viewer: No Title"')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_page_detail_invalid_annotation(self):
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/items/testsuite:123/',
             body=responses_data.BOOK_ITEM_API_DATA,
             status=200,
             content_type='application/json',
         )
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/items/testsuite:123456/',
             body=responses_data.ITEM_API_DATA,
             status=200,
             content_type='application/json',
         )
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/storage/testsuite:234/MODS/',
             body=responses_data.INVALID_SAMPLE_ANNOTATION_XML,
             status=200,
@@ -630,19 +632,19 @@ class TestPageViews(TestCase):
 
 
 class TestPrintsViews(TestCase):
-    @responses.activate
+    @bdr_mock.activate
     def test_print_list(self):
         prints_search_url = f'https://localhost/api/search/?q=rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"+AND+(genre_aat:%22etchings%20(prints)%22+OR+genre_aat:%22engravings%20(prints)%22)&rows=1000'
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             prints_search_url,
             body=responses_data.PRINTS,
             status=200,
             content_type='application/json',
             match_querystring=True,
         )
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/items/testsuite:123456/',
             body=responses_data.ITEM_API_DATA,
             status=200,
@@ -652,19 +654,19 @@ class TestPrintsViews(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
-    @responses.activate
+    @bdr_mock.activate
     def test_print_list_sort_by(self):
         prints_search_url = f'https://localhost/api/search/?q=rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"+AND+(genre_aat:%22etchings%20(prints)%22+OR+genre_aat:%22engravings%20(prints)%22)&rows=1000'
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             prints_search_url,
             body=responses_data.PRINTS,
             status=200,
             content_type='application/json',
             match_querystring=True,
         )
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/items/testsuite:123456/',
             body=responses_data.ITEM_API_DATA,
             status=200,
@@ -674,17 +676,17 @@ class TestPrintsViews(TestCase):
         response = self.client.get(f'{url}?sort_by=authors_abcd')
         self.assertEqual(response.status_code, 200)
 
-    @responses.activate
+    @bdr_mock.activate
     def test_print_detail(self):
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/items/testsuite:123456/',
             body=responses_data.ITEM_API_DATA,
             status=200,
             content_type='application/json',
         )
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/storage/testsuite:234/MODS/',
             body=responses_data.SAMPLE_ANNOTATION_XML,
             status=200,
@@ -713,13 +715,13 @@ class TestPrintsViews(TestCase):
         response = self.client.get(url)
         self.assertRedirects(response, '%s?next=%s' % (reverse('rome_login'), url))
 
-    @responses.activate
+    @bdr_mock.activate
     def test_edit_print_annotation_get(self):
         models.Biography.objects.create(name='Someone', trp_id='0260')
         models.Role.objects.create(text='author')
         models.Genre.objects.create(text='book')
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/storage/testsuite:2/MODS/',
             body=responses_data.SAMPLE_ANNOTATION_XML,
             status=200,
@@ -731,10 +733,10 @@ class TestPrintsViews(TestCase):
         self.assertEqual(response.status_code, 200, f'{response.status_code} - {response.content.decode("utf8")}')
         self.assertContains(response, 'value="Submit Annotation"')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_edit_print_annotation_get_error(self):
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/storage/testsuite:2/MODS/',
             body=responses_data.INVALID_SAMPLE_ANNOTATION_XML,
             status=200,
@@ -757,10 +759,10 @@ class TestEssaysViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Rëd Sox')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_specific_essay(self):
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/search/',
             body=json.dumps({'response': {'docs': [{'pid': 'testsuite:230605', 'primary_title': 'book'}]}}),
             status=200,
@@ -787,14 +789,14 @@ class TestPeopleViews(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Frëd')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_person(self):
         base_url = f'https://localhost/api/collections/{settings.TTWR_COLLECTION_PID}/'
         params = (
             'q=genre_aat:books+AND+name:%22Fr%C3%ABd%22&fq=object_type:implicit-set&fl=*&fq=discover:BDR_PUBLIC&rows=6000'
         )
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             '%s?%s' % (base_url, params),
             body=responses_data.BIO_BOOKS,
             status=200,
@@ -802,8 +804,8 @@ class TestPeopleViews(TransactionTestCase):
             match_querystring=True,
         )
         prints_params = 'q=(genre_aat:%22etchings%20(prints)%22+OR+genre_aat:%22engravings%20(prints)%22)+AND+name:%22Fr%C3%ABd%22&fq=object_type:implicit-set&fl=*&fq=discover:BDR_PUBLIC&rows=6000'
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             '%s?%s' % (base_url, prints_params),
             body=responses_data.BIO_PRINTS,
             status=200,
@@ -811,8 +813,8 @@ class TestPeopleViews(TransactionTestCase):
             match_querystring=True,
         )
         anno_search_url = f'https://localhost/api/search/?q=rel_is_member_of_collection_ssim:"{settings.TTWR_COLLECTION_PID}"+AND+object_type:%22annotation%22+AND+contributor:%22Fr%C3%ABd%22+AND+display:BDR_PUBLIC&rows=6000&fl=rel_is_annotation_of_ssim,primary_title,pid,nonsort'
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             anno_search_url,
             body=responses_data.ANNOTATIONS,
             status=200,
@@ -820,8 +822,8 @@ class TestPeopleViews(TransactionTestCase):
             match_querystring=True,
         )
         pages_search_url = 'https://localhost/api/search/?q=(pid:test%5C:1234)+AND+display:BDR_PUBLIC&fl=pid,primary_title,nonsort,object_type,rel_is_part_of_ssim,rel_has_pagination_ssim&rows=50'
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             pages_search_url,
             body=responses_data.PAGES,
             status=200,
@@ -841,10 +843,10 @@ class TestShopsViews(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'foo')
 
-    @responses.activate
+    @bdr_mock.activate
     def test_shop(self):
-        responses.add(
-            responses.GET,
+        bdr_mock.add(
+            bdr_mock.GET,
             'https://localhost/api/search/',
             body=json.dumps({'response': {'docs': [{'pid': 'testsuite:230605', 'primary_title': 'book'}]}}),
             status=200,

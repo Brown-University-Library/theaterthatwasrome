@@ -2,26 +2,21 @@ import logging
 import xml.etree.ElementTree as ET
 from operator import itemgetter
 
-import requests
+import httpx2
 from django.core.mail import mail_admins
 
+from rome_app.lib import bdr_client
 from rome_app.models import Annotation
 
 logger = logging.getLogger('rome')
 
 
-def fetch_url_content(url: str) -> requests.Response:
+def fetch_url_content(url: str) -> httpx2.Response:
     """
     Fetches BDR metadata and raises an HTTP error when the request fails.
     Called by: views.page_detail(), views.print_detail(), views._get_book_pid_from_page_pid(), get_annotation_detail()
     """
-    logger.debug(f'starting non-top-level-view _fetch_url_content with url, ``{url}``')
-    r = requests.get(url, timeout=60)
-    if r.ok:
-        return r
-    else:
-        logger.error(f'error retrieving {url}: {r.status_code} - {r.text}')
-        raise requests.HTTPError(f'{r.status_code}', response=r)
+    return bdr_client.request('GET', url)
 
 
 def _get_annotation_name_info(mods_name: ET.Element) -> dict[str, str | None]:
