@@ -9,7 +9,7 @@ def get_env_setting(setting):
     try:
         return os.environ[setting]
     except KeyError:
-        error_msg = 'Set the %s env variable' % setting
+        error_msg = f'Set the {setting} env variable'
         raise ImproperlyConfigured(error_msg.encode('utf8'))
 
 
