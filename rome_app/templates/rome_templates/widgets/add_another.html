@@ -1,0 +1,9 @@
+<div class="annotation-related-widget">
+  {{ widget }}
+  <a href="{{ related_url }}" class="add-another" id="add_id_{{ name }}" aria-label="{{ label }}" title="{{ label }}" onclick="return showAddAnotherPopup(this);">
+    {% comment %}Original geometric plus graphic; no third-party artwork or licensing requirements.{% endcomment %}
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+    </svg>
+  </a>
+</div>

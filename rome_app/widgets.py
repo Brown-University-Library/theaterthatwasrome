@@ -1,8 +1,9 @@
 import copy
+
 from django import forms
-from django.templatetags.static import static
+from django.forms.renderers import BaseRenderer, get_default_renderer
 from django.urls import reverse
-from django.utils.safestring import mark_safe
+from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext as _
 
 
@@ -31,15 +32,23 @@ class AddAnotherWidgetWrapper(forms.Widget):
     def media(self):
         return self.widget.media
 
-    def render(self, name, value, *args, **kwargs):
-        model = self.model
-        info = (model._meta.app_label, model._meta.object_name.lower())
+    def render(
+        self, name: str, value: object, attrs: dict | None = None, renderer: BaseRenderer | None = None
+    ) -> SafeString:
+        """
+        Renders a select with a labeled plus control for the existing add-another popup.
+        Called by: Django BoundField rendering
+        """
         self.widget.choices = self.choices
-        output = [self.widget.render(name, value, *args, **kwargs)]
-        related_url = reverse(self.related_url_name)
-        output.append(('<a href="%s" class="add-another" id="add_id_%s" ' + 'onclick="return showAddAnotherPopup(this);">') % (related_url, name))
-        output.append('<img src="%s" width="15" height="15" alt="%s"/></a>' % (static('admin/img/icon_addlink.gif'), _('Add Another')))
-        return mark_safe(''.join(output))
+        context = {
+            'widget': self.widget.render(name, value, attrs=attrs, renderer=renderer),
+            'name': name,
+            'related_url': reverse(self.related_url_name),
+            'label': _('Add another %(model)s') % {'model': self.model._meta.verbose_name},
+        }
+        if renderer is None:
+            renderer = get_default_renderer()
+        return mark_safe(renderer.render('rome_templates/widgets/add_another.html', context))
  
     def build_attrs(self, extra_attrs=None, **kwargs):
         "Helper function for building an attribute dictionary."
@@ -54,4 +63,3 @@ class AddAnotherWidgetWrapper(forms.Widget):
 
     def id_for_label(self, id_):
         return self.widget.id_for_label(id_)
-
