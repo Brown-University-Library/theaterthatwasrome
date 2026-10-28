@@ -16,7 +16,7 @@ _Workflow assessment: 2026-08-31. TTWR code references checked: 2026-10-28._
 
 ## Overview
 
-Adding a book starts in the Brown Digital Repository (BDR). The Theater That Was Rome (TTWR) reads book and page-image records from BDR; its Django database stores related editorial content. Once a book and its page images have the required metadata, relationships, collection membership, public access, and working images, BDR indexing makes them available to TTWR automatically.
+Adding a book starts in the Brown Digital Repository (BDR). The Theater That Was Rome (TTWR) reads book and page-image records from BDR; its Django database stores related editorial content. Once a book and its page images have the required metadata, relationships, collection membership, public access, and working images -- then BDR indexing makes them available to TTWR automatically.
 
 A normal book addition does not require a TTWR code change or a local Django Book record.
 
