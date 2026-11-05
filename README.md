@@ -12,7 +12,7 @@
 
 This repository contains the Django application for [The Theater That Was Rome](https://library.brown.edu/projects/rome/), a Brown University Library site for studying early modern books, prints, annotations, people, essays, shops, and related documents.
 
-The application combines editorial content stored in a local Django database with records, images, and MODS annotations from the Brown Digital Repository (BDR). It currently uses Django 5.2, Python 3.10, `pyproject.toml`, and `uv` for dependency management and command execution.
+The application combines editorial content stored in a local Django database with records, images, and MODS annotations from the Brown Digital Repository (BDR). It currently uses Django 5.2, Python >=3.12.16,<3.13, `pyproject.toml`, and `uv` for dependency management and command execution.
 
 
 ## More info
@@ -37,7 +37,7 @@ The public navigation currently has no login link. Logged-out visitors do not se
 ### Prerequisites
 
 - Git
-- [`uv`](https://docs.astral.sh/uv/)
+- [`uv`](https://docs.astral.sh/uv/) 0.13.6 or newer; uv selects Python from the requirement in `pyproject.toml`
 - The correct local .env configuration, obtained from a developer
 - (likely) A `rome.sqlite3` file, obtained from a developer
 
@@ -59,7 +59,7 @@ cd ttwr/
 uv sync --locked --group local
 ```
 
-This completes the normal local installation. 
+This completes the normal local installation. Annotation XML uses `bdrxml` with Princeton's published `neuxml` package.
 
 Django can load records from the local database, including biographies, essays, shops, documents, genres, roles, and database-backed informational pages. Properly configued `.env` settings will allow (if on VPN) GET network access to the configured BDR host. However, some BDR-dependent books, prints, page images, annotation-creation, search data, and related-record features may be unavailable, incomplete, or displayed as broken images.
 

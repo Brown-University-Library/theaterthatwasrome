@@ -1,8 +1,8 @@
 # Agent & Copilot Development Instructions
 
 This repository is set up for agentic/Copilot workflows.
-- **Framework:** Django 3.2
-- **Python version:** 3.10.1
+- **Framework:** Django 5.2
+- **Python version:** >=3.12.16,<3.13
 - Project is being prepared for agent-based automation, including accessibility checks (pa11y) and code linting (ruff).
 - Add further agentic info/automation instructions here as new workflows are introduced.
 
@@ -10,7 +10,7 @@ This repository is set up for agentic/Copilot workflows.
 
 ### Type hints and imports
 
-- Use Python 3.10 type hints everywhere (functions and important variables).
+- Use Python 3.12 type hints everywhere (functions and important variables).
 
 ### Script structure
 
