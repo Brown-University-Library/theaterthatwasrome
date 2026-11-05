@@ -1,10 +1,9 @@
 import os
 import pathlib
-import pprint
 
 import dotenv
 
-from .base import *  # noqa: F403 -- imports settings necessary for run_tests.py
+from .base import *  # imports settings necessary for run_tests.py
 
 ## Load environment variables from .env file
 dotenv_path = pathlib.Path(__file__).parent.parent.parent / '../.env_unit_tests'
@@ -31,12 +30,10 @@ DATABASES = {
             'USER': os.getenv('TEST_DB_USER'),
             'PASSWORD': os.getenv('TEST_DB_PASSWORD'),
             'HOST': os.getenv('TEST_DB_HOST'),
-            'PORT': int(os.getenv('TEST_DB_PORT', 3306)),
+            'PORT': int(os.getenv('TEST_DB_PORT', '3306')),
         },
     }
 }
-pprint.pprint(DATABASES)
-
 
 SECRET_KEY = '1234567890'
 STATIC_URL = '/static/'
