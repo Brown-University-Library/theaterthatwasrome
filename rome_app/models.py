@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models
 from django.http import Http404
 from django.urls import reverse
-from eulxml.xmlmap import load_xmlobject_from_string
+from neuxml.xmlmap import load_xmlobject_from_string
 
 from rome_app.lib import bdr_client
 
@@ -760,7 +760,7 @@ class Annotation:
         else:  # no self._mods_obj
             if update:
                 raise ValueError("no mods obj - can't update")
-            self._mods_obj = mods.make_mods()
+            self._mods_obj = mods.make_mods(schema_version='3.7')
         # at this point, we want to put the form data into the mods obj (could be update or new)
         self._mods_obj.title_info_list = []  # clear out any old titles
         title = mods.TitleInfo()

@@ -5,7 +5,7 @@ from xml.etree import ElementTree
 
 from bdrxml import mods
 from django.test import SimpleTestCase, override_settings
-from eulxml.xmlmap import load_xmlobject_from_string
+from neuxml.xmlmap import load_xmlobject_from_string
 
 from rome_app import app_settings
 from rome_app.models import Annotation, Biography, Genre, Role
@@ -74,6 +74,10 @@ class TestAnnotationMods(SimpleTestCase):
         """
         root = ElementTree.fromstring(make_annotation().get_mods_obj().serialize())
         self.assertEqual(root.tag, '{http://www.loc.gov/mods/v3}mods')
+        self.assertEqual(
+            root.get('{http://www.w3.org/2001/XMLSchema-instance}schemaLocation'),
+            'http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-7.xsd',
+        )
         titles = root.findall('mods:titleInfo', NAMESPACES)
         self.assertEqual(
             [(title.get('lang'), title.findtext('mods:title', namespaces=NAMESPACES)) for title in titles],
