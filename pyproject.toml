@@ -24,11 +24,11 @@ local = [
     "responses~=0.26.3",
     ]
 staging = [ 
-    "mysqlclient~=2.2.8",
+    "mysqlclient~=2.1.0",
     "responses~=0.26.3",
     ]
 prod = [ 
-    "mysqlclient~=2.2.8",
+    "mysqlclient~=2.1.0",
     ]
 ci_tests = [ 
     "responses~=0.26.3",

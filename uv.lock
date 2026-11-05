@@ -232,12 +232,9 @@ wheels = [
 
 [[package]]
 name = "mysqlclient"
-version = "2.2.8"
+version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/eb/b0/9df076488cb2e536d40ce6dbd4273c1f20a386e31ffe6e7cb613902b3c2a/mysqlclient-2.2.8.tar.gz", hash = "sha256:8ed20c5615a915da451bb308c7d0306648a4fd9a2809ba95c992690006306199", size = 92287, upload-time = "2026-02-10T10:58:37.405Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/1f/7d6b3fbfc8a317805fdb8bbfbc23af99f2090497090e82513daf491a29ce/mysqlclient-2.2.8-cp312-cp312-win_amd64.whl", hash = "sha256:000c7ec3d11e7c411db832e4cfcd7f05db47464326381f5d5ae991b4bb572f93", size = 207171, upload-time = "2026-02-10T10:58:39.827Z" },
-]
+sdist = { url = "https://files.pythonhosted.org/packages/50/5f/eac919b88b9df39bbe4a855f136d58f80d191cfea34a3dcf96bf5d8ace0a/mysqlclient-2.1.1.tar.gz", hash = "sha256:828757e419fb11dd6c5ed2576ec92c3efaa93a0f7c39e263586d1ee779c3d782", size = 88138, upload-time = "2022-06-22T08:12:44.246Z" }
 
 [[package]]
 name = "neuxml"
@@ -451,9 +448,9 @@ requires-dist = [
 [package.metadata.requires-dev]
 ci-tests = [{ name = "responses", specifier = "~=0.26.3" }]
 local = [{ name = "responses", specifier = "~=0.26.3" }]
-prod = [{ name = "mysqlclient", specifier = "~=2.2.8" }]
+prod = [{ name = "mysqlclient", specifier = "~=2.1.0" }]
 staging = [
-    { name = "mysqlclient", specifier = "~=2.2.8" },
+    { name = "mysqlclient", specifier = "~=2.1.0" },
     { name = "responses", specifier = "~=0.26.3" },
 ]
 
