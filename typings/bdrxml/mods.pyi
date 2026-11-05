@@ -2,8 +2,8 @@
 
 from collections.abc import MutableSequence
 
-from eulxml.xmlmap import XmlObject
 from lxml.etree import _Element
+from neuxml.xmlmap import XmlObject
 
 class Common(XmlObject):
     node: _Element
@@ -59,4 +59,4 @@ class Mods(Common):
     def create_origin_info(self) -> None: ...
     def serialize(self, stream: None = None, pretty: bool = False) -> bytes: ...
 
-def make_mods() -> Mods: ...
+def make_mods(*, schema_version: str = '3.8') -> Mods: ...

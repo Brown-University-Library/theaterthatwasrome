@@ -24,7 +24,7 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 
 - Primary language: Python
 - Framework: Django 5.2
-- Target runtime: Python 3.10, as constrained by `pyproject.toml`
+- Target runtime: Python >=3.12.16,<3.13, as constrained by `pyproject.toml`
 - Dependency / execution tool: `uv`
 - Project root: the directory containing this file, `.git/`, `manage.py`, and `pyproject.toml`
 - This is a public repository. Never copy credentials, tokens, private host details, or other sensitive values from environment files, logs, backups, or material in the enclosing directory into repository files, tests, messages, or documentation.
@@ -46,7 +46,7 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 
 ### Type hints and imports
 
-- Use Python 3.10-compatible type hints for functions and important variables.
+- Use Python 3.12-compatible type hints for functions and important variables.
 - Prefer builtin generics (for example, `list[str]` and `dict[str, int]`) over `typing.List` and `typing.Dict` in new or substantially changed code.
 - Prefer PEP 604 unions (for example, `str | None`) over `Optional[str]` in new or substantially changed code.
 - Avoid `typing` and `annotations` imports unless strictly necessary.
@@ -204,7 +204,7 @@ If other instruction files exist (Copilot, IDE rules, contributor docs) and conf
 ### Commit messages
 
 - After [commit authorization](#commit-authorization), group related files into logical, focused commits; do not require a separate commit for every file.
-- Use no more than ten words per commit message. Write in the present tense to complete "This commit...", beginning with a verb such as "Adds," "Implements," or "Updates."
+- Use no more than fifteen words per commit message. Write in the present tense to complete "This commit...", beginning with a verb such as "Adds," "Implements," or "Updates."
 
 
 ## Privacy and publication
@@ -257,7 +257,7 @@ This Django application serves The Theater That Was Rome, a scholarly site for e
 ### Annotation creation and editing
 
 - Create/edit routes require login. The views combine `AnnotationForm` with person and inscription formsets.
-- `Annotation` in `rome_app/models.py` translates cleaned form data to and from MODS XML using `bdrxml` and `eulxml`.
+- `Annotation` in `rome_app/models.py` translates cleaned form data to and from MODS XML using `bdrxml` and `neuxml`. New annotations explicitly request MODS 3.7 to preserve the existing XML format.
 - New annotations are sent to BDR with POST; edits are sent with PUT. These paths require BDR identity and authorization environment values. Never exercise a live write while running ordinary tests or exploratory commands.
 - A MODS name links to a local biography through the biography's zero-padded `trp_id` in an `xlink:href`; its role text must match a local `Role`. Invalid existing metadata can raise `InvalidNameError` and send an administrator email.
 - An existing annotation's genre text must match a local `Genre`. `MissingGenreError` produces a correction page through the shared editing helper, with HTTP 409 and no caching. Opening the page does not add genre records or change the annotation. The editor responsible for genre data must resolve the mismatch before the edit form can load. `unit_tests/test_annotation_genres.py` covers both edit routes and recovery after correction.

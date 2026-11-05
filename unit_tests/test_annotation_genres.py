@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
-from eulxml.xmlmap import load_xmlobject_from_string
+from neuxml.xmlmap import load_xmlobject_from_string
 
 from rome_app.models import Annotation, Genre, MissingGenreError
 from unit_tests.http_mock import BdrMock

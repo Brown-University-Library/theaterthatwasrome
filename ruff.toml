@@ -1,7 +1,7 @@
 ## settings ##
 line-length = 125
 indent-width = 4
-target-version = "py310"
+target-version = "py312"
 
 [format]
 docstring-code-format = false
